@@ -1,0 +1,45 @@
+services:
+  db-casablanca:
+    image: container-registry.oracle.com/database/free:latest-lite
+    container_name: oracle-casablanca
+    environment:
+      - ORACLE_PWD=OracleAdmin123!
+    ports:
+      - "1521:1521"
+    volumes:
+      - casablanca-data:/opt/oracle/oradata
+    networks:
+      - maroc-db-net
+
+  db-rabat:
+    image: container-registry.oracle.com/database/free:latest-lite
+    container_name: oracle-rabat
+    environment:
+      - ORACLE_PWD=OracleAdmin123!
+    ports:
+      - "1522:1521"
+    volumes:
+      - rabat-data:/opt/oracle/oradata
+    networks:
+      - maroc-db-net
+
+  db-marrakech:
+    image: container-registry.oracle.com/database/free:latest-lite
+    container_name: oracle-marrakech
+    environment:
+      - ORACLE_PWD=OracleAdmin123!
+    ports:
+      - "1523:1521"
+    volumes:
+      - marrakech-data:/opt/oracle/oradata
+    networks:
+      - maroc-db-net
+
+volumes:
+  casablanca-data:
+  rabat-data:
+  marrakech-data:
+
+networks:
+  maroc-db-net:
+    driver: bridge
