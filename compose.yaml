@@ -4,13 +4,13 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        - SCRIPT_PATTERN=${SCRIPT_PATTERN:-./scripts-casablanca/*.sql} 
+        - SCRIPTS=${SCRIPTS:-./scripts-casablanca/*.sql} 
     image: oracle-casablanca-image
     container_name: oracle-casablanca
     environment:
       - ORACLE_PWD=OracleAdmin123!
     ports:
-      - "1521:1521"
+      - "1522:1521"
     volumes:
       - casablanca-data:/opt/oracle/oradata
       - ./casablanca-logs:/opt/oracle/logs
@@ -29,7 +29,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        - SCRIPT_PATTERN=${SCRIPT_PATTERN:-./scripts-rabat/*.sql} 
+        - SCRIPTS=${SCRIPTS:-./scripts-rabat/*.sql} 
     image: oracle-rabat-image
     container_name: oracle-rabat
     environment:
@@ -54,13 +54,13 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        - SCRIPT_PATTERN=${SCRIPT_PATTERN:-./scripts-marrakech/*.sql} 
+        - SCRIPTS=${SCRIPTS:-./scripts-marrakech/*.sql} 
     image: oracle-marrakech-image
     container_name: oracle-marrakech
     environment:
       - ORACLE_PWD=OracleAdmin123!
     ports:
-      - "1521:1521"
+      - "1522:1521"
     volumes:
       - marrakech-data:/opt/oracle/oradata
       - ./marrakech-logs:/opt/oracle/logs
