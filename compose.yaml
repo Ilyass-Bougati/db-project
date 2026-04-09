@@ -5,9 +5,7 @@ services:
       dockerfile: Dockerfile
       args:
         - SCRIPT_PATTERN=${SCRIPT_PATTERN:-./scripts-casablanca/*.sql} 
-    
     image: oracle-casablanca-image
-    
     container_name: oracle-casablanca
     environment:
       - ORACLE_PWD=OracleAdmin123!
@@ -15,6 +13,14 @@ services:
       - "1521:1521"
     volumes:
       - casablanca-data:/opt/oracle/oradata
+      - ./casablanca-logs:/opt/oracle/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/admin@//localhost:1521/XEPDB1 > /dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
     networks:
       - maroc-db-net
 
@@ -24,9 +30,7 @@ services:
       dockerfile: Dockerfile
       args:
         - SCRIPT_PATTERN=${SCRIPT_PATTERN:-./scripts-rabat/*.sql} 
-    
     image: oracle-rabat-image
-    
     container_name: oracle-rabat
     environment:
       - ORACLE_PWD=OracleAdmin123!
@@ -34,6 +38,14 @@ services:
       - "1521:1521"
     volumes:
       - rabat-data:/opt/oracle/oradata
+      - ./rabat-logs:/opt/oracle/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/admin@//localhost:1521/XEPDB1 > /dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
     networks:
       - maroc-db-net
 
@@ -43,9 +55,7 @@ services:
       dockerfile: Dockerfile
       args:
         - SCRIPT_PATTERN=${SCRIPT_PATTERN:-./scripts-marrakech/*.sql} 
-    
     image: oracle-marrakech-image
-    
     container_name: oracle-marrakech
     environment:
       - ORACLE_PWD=OracleAdmin123!
@@ -53,6 +63,14 @@ services:
       - "1521:1521"
     volumes:
       - marrakech-data:/opt/oracle/oradata
+      - ./marrakech-logs:/opt/oracle/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/admin@//localhost:1521/XEPDB1 > /dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
     networks:
       - maroc-db-net
 
