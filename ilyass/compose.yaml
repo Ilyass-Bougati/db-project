@@ -10,7 +10,7 @@ services:
     environment:
       - ORACLE_PWD=OracleAdmin123!
     ports:
-      - "1522:1521"
+      - "1523:1521"
     volumes:
       - casablanca-data:/opt/oracle/oradata
       - ./casablanca-logs:/opt/oracle/logs
