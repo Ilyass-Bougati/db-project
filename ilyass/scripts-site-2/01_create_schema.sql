@@ -34,6 +34,7 @@ EXCEPTION
 END;
 /
 
+-- TODO: Change these quotas to something reasonable
 -- Création de l'utilisateur de db global
 CREATE USER g_user IDENTIFIED BY mon_mdp
 DEFAULT TABLESPACE USERS

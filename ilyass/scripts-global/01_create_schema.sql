@@ -34,6 +34,7 @@ EXCEPTION
 END;
 /
 
+-- TODO: Change these quotas to something reasonable
 -- Création de l'utilisateur de site 2
 CREATE USER s2_user IDENTIFIED BY mon_mdp
 DEFAULT TABLESPACE USERS
@@ -59,12 +60,6 @@ GRANT CREATE SESSION,
       CREATE DATABASE LINK,
       CREATE PUBLIC DATABASE LINK
 TO pdb_admin;
-
--- Accorder les droits sur le tablespace
-GRANT UNLIMITED TABLESPACE TO mon_user;
-
--- Basculer sur le schéma de l'utilisateur
-ALTER SESSION SET CURRENT_SCHEMA = mon_user;
 
 -- Message de confirmation
 SET SERVEROUTPUT ON;

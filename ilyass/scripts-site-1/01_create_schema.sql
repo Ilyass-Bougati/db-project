@@ -34,6 +34,7 @@ EXCEPTION
 END;
 /
 
+-- TODO: Change these quotas to something reasonable
 -- Création de l'utilisateur de site 2
 CREATE USER s2_user IDENTIFIED BY mon_mdp
 DEFAULT TABLESPACE USERS
