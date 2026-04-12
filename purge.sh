@@ -19,3 +19,7 @@ docker volume prune --all -f
 # delete all networks
 echo -e "\e[33mDeleting all networks\e[0m"
 docker network prune -f
+
+# delete all images
+echo -e "\e[33mDeleting all images\e[0m"
+docker rmi $(docker images -q)

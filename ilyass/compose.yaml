@@ -1,44 +1,18 @@
 services:
-  db-casablanca:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - SCRIPTS=${SCRIPTS:-./scripts-casablanca/*.sql} 
-    image: oracle-casablanca-image
-    container_name: oracle-casablanca
-    environment:
-      - ORACLE_PWD=OracleAdmin123!
-    ports:
-      - "1523:1521"
-    volumes:
-      - casablanca-data:/opt/oracle/oradata
-      - ./casablanca-logs:/opt/oracle/logs
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/admin@//localhost:1521/XEPDB1 > /dev/null 2>&1 || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 10
-      start_period: 90s
-    networks:
-      - maroc-db-net
-
   db-rabat:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - SCRIPTS=${SCRIPTS:-./scripts-rabat/*.sql} 
-    image: oracle-rabat-image
+    image: gvenzl/oracle-xe:21-slim-faststart 
     container_name: oracle-rabat
     environment:
       - ORACLE_PWD=OracleAdmin123!
+      - ORACLE_PASSWORD=admin 
+      - APP_USER=mon_user 
+      - APP_USER_PASSWORD=mon_mdp 
     ports:
-      - "1521:1521"
+      - "1523:1521"
     volumes:
       - rabat-data:/opt/oracle/oradata
       - ./rabat-logs:/opt/oracle/logs
+      - ./scripts-rabat:/container-entrypoint-initdb.d/ 
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/admin@//localhost:1521/XEPDB1 > /dev/null 2>&1 || exit 1"]
@@ -49,21 +23,47 @@ services:
     networks:
       - maroc-db-net
 
+  db-casablanca:
+    image: gvenzl/oracle-xe:21-slim-faststart 
+    container_name: oracle-casablanca
+    environment:
+      - ORACLE_PWD=OracleAdmin123!
+      - ORACLE_PASSWORD=admin 
+      - APP_USER=mon_user 
+      - APP_USER_PASSWORD=mon_mdp 
+    ports:
+      - "1521:1521"
+    volumes:
+      - casablanca-data:/opt/oracle/oradata
+      - ./casablanca-logs:/opt/oracle/logs
+      - ./scripts-casablanca:/container-entrypoint-initdb.d/ 
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/admin@//localhost:1521/XEPDB1 > /dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+    networks:
+      - maroc-db-net
+    depends_on:
+      db-rabat:
+        condition: service_healthy
+
   db-marrakech:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - SCRIPTS=${SCRIPTS:-./scripts-marrakech/*.sql} 
-    image: oracle-marrakech-image
+    image: gvenzl/oracle-xe:21-slim-faststart 
     container_name: oracle-marrakech
     environment:
       - ORACLE_PWD=OracleAdmin123!
+      - ORACLE_PASSWORD=admin 
+      - APP_USER=mon_user 
+      - APP_USER_PASSWORD=mon_mdp 
     ports:
       - "1522:1521"
     volumes:
       - marrakech-data:/opt/oracle/oradata
       - ./marrakech-logs:/opt/oracle/logs
+      - ./scripts-marrakech:/container-entrypoint-initdb.d/ 
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/admin@//localhost:1521/XEPDB1 > /dev/null 2>&1 || exit 1"]
@@ -73,6 +73,9 @@ services:
       start_period: 90s
     networks:
       - maroc-db-net
+    depends_on:
+      db-rabat:
+        condition: service_healthy
 
 volumes:
   casablanca-data:
