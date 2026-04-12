@@ -1,31 +1,7 @@
 services:
-  db-rabat:
+  db-global:
     image: gvenzl/oracle-xe:21-slim-faststart 
-    container_name: oracle-rabat
-    environment:
-      - ORACLE_PWD=OracleAdmin123!
-      - ORACLE_PASSWORD=admin 
-      - APP_USER=mon_user 
-      - APP_USER_PASSWORD=mon_mdp 
-    ports:
-      - "1523:1521"
-    volumes:
-      - rabat-data:/opt/oracle/oradata
-      - ./rabat-logs:/opt/oracle/logs
-      - ./scripts-rabat:/container-entrypoint-initdb.d/ 
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/admin@//localhost:1521/XEPDB1 > /dev/null 2>&1 || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 10
-      start_period: 90s
-    networks:
-      - maroc-db-net
-
-  db-casablanca:
-    image: gvenzl/oracle-xe:21-slim-faststart 
-    container_name: oracle-casablanca
+    container_name: oracle-global
     environment:
       - ORACLE_PWD=OracleAdmin123!
       - ORACLE_PASSWORD=admin 
@@ -34,9 +10,33 @@ services:
     ports:
       - "1521:1521"
     volumes:
-      - casablanca-data:/opt/oracle/oradata
-      - ./casablanca-logs:/opt/oracle/logs
-      - ./scripts-casablanca:/container-entrypoint-initdb.d/ 
+      - global-data:/opt/oracle/oradata
+      - ./global-logs:/opt/oracle/logs
+      - ./scripts-global:/container-entrypoint-initdb.d/ 
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/admin@//localhost:1521/XEPDB1 > /dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+    networks:
+      - maroc-db-net
+
+  db-site-2:
+    image: gvenzl/oracle-xe:21-slim-faststart 
+    container_name: oracle-site-2
+    environment:
+      - ORACLE_PWD=OracleAdmin123!
+      - ORACLE_PASSWORD=admin 
+      - APP_USER=mon_user 
+      - APP_USER_PASSWORD=mon_mdp 
+    ports:
+      - "1523:1521"
+    volumes:
+      - site-2-data:/opt/oracle/oradata
+      - ./site-2-logs:/opt/oracle/logs
+      - ./scripts-site-2:/container-entrypoint-initdb.d/ 
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/admin@//localhost:1521/XEPDB1 > /dev/null 2>&1 || exit 1"]
@@ -47,12 +47,12 @@ services:
     networks:
       - maroc-db-net
     depends_on:
-      db-rabat:
+      db-global:
         condition: service_healthy
 
-  db-marrakech:
+  db-site-1:
     image: gvenzl/oracle-xe:21-slim-faststart 
-    container_name: oracle-marrakech
+    container_name: oracle-site-1
     environment:
       - ORACLE_PWD=OracleAdmin123!
       - ORACLE_PASSWORD=admin 
@@ -61,9 +61,9 @@ services:
     ports:
       - "1522:1521"
     volumes:
-      - marrakech-data:/opt/oracle/oradata
-      - ./marrakech-logs:/opt/oracle/logs
-      - ./scripts-marrakech:/container-entrypoint-initdb.d/ 
+      - site-1-data:/opt/oracle/oradata
+      - ./site-1-logs:/opt/oracle/logs
+      - ./scripts-site-1:/container-entrypoint-initdb.d/ 
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/admin@//localhost:1521/XEPDB1 > /dev/null 2>&1 || exit 1"]
@@ -74,13 +74,13 @@ services:
     networks:
       - maroc-db-net
     depends_on:
-      db-rabat:
+      db-global:
         condition: service_healthy
 
 volumes:
-  casablanca-data:
-  rabat-data:
-  marrakech-data:
+  site-2-data:
+  global-data:
+  site-1-data:
 
 networks:
   maroc-db-net:

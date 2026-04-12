@@ -1,4 +1,4 @@
-ALTER SESSION SET CONTAINER = RABAT_PDB;
+ALTER SESSION SET CONTAINER = G_PDB;
 ALTER SESSION SET CURRENT_SCHEMA = pdb_admin;
 
 CREATE ROLE site_role;
@@ -12,5 +12,5 @@ GRANT SELECT ON PRODUITS TO site_role;
 GRANT SELECT ON LigneCommandes TO site_role;
 GRANT CREATE SESSION TO site_role;
 
-GRANT site_role TO marrakech_user;
-GRANT site_role TO casablanca_user;
+GRANT site_role TO s1_user;
+GRANT site_role TO s2_user;

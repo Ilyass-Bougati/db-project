@@ -1,25 +1,25 @@
 -- Connect to the root container (CDB$ROOT)
 ALTER SESSION SET CONTAINER = CDB$ROOT;
 
-CREATE PLUGGABLE DATABASE MARRAKECH_PDB
+CREATE PLUGGABLE DATABASE S2_PDB
   ADMIN USER pdb_admin IDENTIFIED BY Admin123
   ROLES = (DBA)
   DEFAULT TABLESPACE USERS
-    DATAFILE '/opt/oracle/oradata/XE/MARRAKECH_PDB/users01.dbf'
+    DATAFILE '/opt/oracle/oradata/XE/S2_PDB/users01.dbf'
     SIZE 250M AUTOEXTEND ON
   FILE_NAME_CONVERT = (
     '/opt/oracle/oradata/XE/pdbseed/',
-    '/opt/oracle/oradata/XE/MARRAKECH_PDB/'
+    '/opt/oracle/oradata/XE/S2_PDB/'
   );
 
 -- Open the new PDB
-ALTER PLUGGABLE DATABASE MARRAKECH_PDB OPEN;
+ALTER PLUGGABLE DATABASE S2_PDB OPEN;
 
 -- Make it auto-open on DB restart
-ALTER PLUGGABLE DATABASE MARRAKECH_PDB SAVE STATE;
+ALTER PLUGGABLE DATABASE S2_PDB SAVE STATE;
 
 -- Connexion au conteneur PDB
-ALTER SESSION SET CONTAINER = MARRAKECH_PDB;
+ALTER SESSION SET CONTAINER = S2_PDB;
 
 ALTER USER pdb_admin QUOTA UNLIMITED ON USERS;
 
@@ -34,13 +34,13 @@ EXCEPTION
 END;
 /
 
--- Création de l'utilisateur de casablanca
-CREATE USER casablanca_user IDENTIFIED BY mon_mdp
+-- Création de l'utilisateur de db global
+CREATE USER g_user IDENTIFIED BY mon_mdp
 DEFAULT TABLESPACE USERS
 QUOTA UNLIMITED ON USERS;
 
--- Création de l'utilisateur de marrakech
-CREATE USER rabat_user IDENTIFIED BY mon_mdp
+-- Création de l'utilisateur de site 1
+CREATE USER s1_user IDENTIFIED BY mon_mdp
 DEFAULT TABLESPACE USERS
 QUOTA UNLIMITED ON USERS;
 
@@ -69,6 +69,6 @@ ALTER SESSION SET CURRENT_SCHEMA = mon_user;
 -- Message de confirmation
 SET SERVEROUTPUT ON;
 BEGIN
-    DBMS_OUTPUT.PUT_LINE('✅ Schema cree avec succes pour mon_user dans RABAT');
+    DBMS_OUTPUT.PUT_LINE('✅ Schema cree avec succes pour mon_user dans SITE 2');
 END;
 /
