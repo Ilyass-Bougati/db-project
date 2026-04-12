@@ -1,3 +1,7 @@
+-- Connexion au conteneur PDB
+ALTER SESSION SET CONTAINER = RABAT_PDB;
+ALTER SESSION SET CURRENT_SCHEMA = pdb_admin;
+
 -- Altering the date format
 ALTER SESSION SET NLS_DATE_FORMAT = 'DD/MM/YYYY';
 

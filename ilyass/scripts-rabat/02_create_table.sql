@@ -1,3 +1,7 @@
+-- Connexion au conteneur PDB
+ALTER SESSION SET CONTAINER = RABAT_PDB;
+ALTER SESSION SET CURRENT_SCHEMA = pdb_admin;
+
 CREATE TABLE CLIENTS 
    (IdClient Number primary key,
 CODECLIENT VARCHAR2(100), 
