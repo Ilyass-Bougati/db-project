@@ -1,6 +1,7 @@
 -- Connexion au conteneur PDB
 ALTER SESSION SET CONTAINER = S2_PDB;
-ALTER SESSION SET CURRENT_SCHEMA = pdb_admin;
+CONNECT pdb_admin/mon_mdp@S1_PDB;
+-- ALTER SESSION SET CURRENT_SCHEMA = pdb_admin;
 
 CREATE DATABASE LINK link_to_global
     CONNECT TO s2_user
