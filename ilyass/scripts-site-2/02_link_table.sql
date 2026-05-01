@@ -1,14 +1,17 @@
 -- Connexion au conteneur PDB
-ALTER SESSION SET CONTAINER = S2_PDB;
-CONNECT pdb_admin/mon_mdp@S1_PDB;
--- ALTER SESSION SET CURRENT_SCHEMA = pdb_admin;
+CONNECT pdb_admin/Admin123@//localhost:1521/S2_PDB;
 
 CREATE DATABASE LINK link_to_global
     CONNECT TO s2_user
-        IDENTIFIED BY mon_mdp
-    USING '//db-global:1521/G_PDB';
+    IDENTIFIED BY mon_mdp
+    USING 'GLOBAL_DB_ALIAS';
 
--- Tables
+-- CREATE DATABASE LINK link_to_global
+--     CONNECT TO s2_user
+--         IDENTIFIED BY mon_mdp
+--     USING '//db-global:1521/G_PDB';
+
+-- -- -- Tables
 CREATE OR REPLACE SYNONYM CLIENTS         FOR pdb_admin.CLIENTS@link_to_global;
 CREATE OR REPLACE SYNONYM FOURNISSEURS    FOR pdb_admin.FOURNISSEURS@link_to_global;
 CREATE OR REPLACE SYNONYM EMPLOYES        FOR pdb_admin.EMPLOYES@link_to_global;
