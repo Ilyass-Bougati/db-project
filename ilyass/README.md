@@ -13,7 +13,6 @@ docker exec -it oracle-site-2 sqlplus pdb_admin/Admin123@//localhost:1522/S2_PDB
 
 # Things to add (12/04/2026)
 
-- [ ] The Fragmentation
 - [ ] The Synchronization
 - [ ] Proper logging (maybe use loki)
 - [ ] A better way of handling authorities (Roles didn't work)
