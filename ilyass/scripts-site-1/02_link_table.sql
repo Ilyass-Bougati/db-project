@@ -14,3 +14,4 @@ CREATE OR REPLACE SYNONYM CATEGORIES      FOR pdb_admin.CATEGORIES@link_to_globa
 CREATE OR REPLACE SYNONYM COMMANDES       FOR pdb_admin.COMMANDES@link_to_global;
 CREATE OR REPLACE SYNONYM PRODUITS        FOR pdb_admin.PRODUITS@link_to_global;
 CREATE OR REPLACE SYNONYM LIGNECOMMANDES  FOR pdb_admin.LIGNECOMMANDES@link_to_global;
+CREATE OR REPLACE SYNONYM insert_ligne_commande      FOR pdb_admin.insert_ligne_commande@link_to_global;

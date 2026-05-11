@@ -17,11 +17,11 @@ services:
       - ./tnsnames.ora:/opt/oracle/network/admin/tnsnames.ora
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/admin@//localhost:1521/XEPDB1 > /dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "echo 'SELECT 1 FROM DUAL;' | sqlplus -s s1_user/mon_mdp@//localhost:1521/G_PDB > /dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 10
-      start_period: 90s
+      retries: 20
+      start_period: 120s
     networks:
       - maroc-db-net
 
