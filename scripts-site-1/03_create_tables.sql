@@ -1,59 +1,73 @@
--- Connexion au conteneur PDB
+-- =============================================================
+-- Site 1 — Fragment tables (Scenario 1, R1)
+-- Criteria: IDCATEG = 50 AND QUANTITE > 100
+-- All source data is fetched via synonyms pointing to the global DB.
+-- =============================================================
+
 CONNECT pdb_admin/Admin123@//localhost:1521/S1_PDB;
 
--- select the ligne commandes
+-- -------------------------------------------------------------
+-- LIGNECOMMANDES1
+-- Subset of order lines that match R1.
+-- -------------------------------------------------------------
 CREATE TABLE LIGNECOMMANDES1 AS
-  SELECT LIGNECOMMANDES.*
-  FROM   LIGNECOMMANDES
-         JOIN PRODUITS
-           ON LIGNECOMMANDES.IDPRODUIT = PRODUITS.IDPRODUIT
-  WHERE  LIGNECOMMANDES.QUANTITE > 100
-         AND PRODUITS.IDCATEG = 50; 
+    SELECT lc.*
+    FROM   LIGNECOMMANDES lc
+    JOIN   PRODUITS p ON lc.IDPRODUIT = p.IDPRODUIT
+    WHERE  lc.QUANTITE > 100
+    AND    p.IDCATEG   = 50;
 
--- selecting the products
-CREATE TABLE PRODUITS1
-AS SELECT DISTINCT PRODUITS.*
-FROM PRODUITS
-JOIN LIGNECOMMANDES1
-ON PRODUITS.IDPRODUIT = LIGNECOMMANDES1.IDPRODUIT;
+-- Primary key is not inherited from CREATE TABLE AS SELECT
+ALTER TABLE LIGNECOMMANDES1
+    ADD CONSTRAINT lignecommandes1_pk PRIMARY KEY (IDLIGNECOMMANDE);
+
+-- -------------------------------------------------------------
+-- PRODUITS1
+-- Only the products referenced by LIGNECOMMANDES1 rows.
+-- -------------------------------------------------------------
+CREATE TABLE PRODUITS1 AS
+    SELECT DISTINCT p.*
+    FROM   PRODUITS p
+    JOIN   LIGNECOMMANDES1 lc ON p.IDPRODUIT = lc.IDPRODUIT;
 
 ALTER TABLE PRODUITS1
-ADD CONSTRAINT produits1_primary_key
-PRIMARY KEY (IDPRODUIT);
+    ADD CONSTRAINT produits1_pk PRIMARY KEY (IDPRODUIT);
 
--- selecting the commandes
-CREATE TABLE COMMANDES1
-AS SELECT DISTINCT COMMANDES.*
-FROM COMMANDES
-JOIN LIGNECOMMANDES1
-ON COMMANDES.IDCOMMANDE = LIGNECOMMANDES1.IDCOMMANDE;
+-- -------------------------------------------------------------
+-- COMMANDES1
+-- Only the orders referenced by LIGNECOMMANDES1 rows.
+-- -------------------------------------------------------------
+CREATE TABLE COMMANDES1 AS
+    SELECT DISTINCT cmd.*
+    FROM   COMMANDES cmd
+    JOIN   LIGNECOMMANDES1 lc ON cmd.IDCOMMANDE = lc.IDCOMMANDE;
 
 ALTER TABLE COMMANDES1
-ADD CONSTRAINT commandes1_primary_key
-PRIMARY KEY (IDCOMMANDE);
+    ADD CONSTRAINT commandes1_pk PRIMARY KEY (IDCOMMANDE);
 
--- selecting the clients
-CREATE TABLE CLIENTS1
-AS SELECT DISTINCT CLIENTS.*
-FROM CLIENTS
-JOIN COMMANDES1
-ON CLIENTS.IDCLIENT = COMMANDES1.IDCLIENT;
+-- -------------------------------------------------------------
+-- CLIENTS1
+-- Only the clients who own orders in COMMANDES1.
+-- -------------------------------------------------------------
+CREATE TABLE CLIENTS1 AS
+    SELECT DISTINCT c.*
+    FROM   CLIENTS c
+    JOIN   COMMANDES1 cmd ON c.IDCLIENT = cmd.IDCLIENT;
 
 ALTER TABLE CLIENTS1
-ADD CONSTRAINT clients1_primary_key
-PRIMARY KEY (IDCLIENT);
+    ADD CONSTRAINT clients1_pk PRIMARY KEY (IDCLIENT);
 
+-- -------------------------------------------------------------
+-- Referential integrity constraints
+-- -------------------------------------------------------------
 ALTER TABLE COMMANDES1
-ADD CONSTRAINT commandes1_clients1_fk
-FOREIGN KEY (IDCLIENT)
-REFERENCES CLIENTS1(IDCLIENT)
+    ADD CONSTRAINT commandes1_clients1_fk
+    FOREIGN KEY (IDCLIENT) REFERENCES CLIENTS1(IDCLIENT);
 
 ALTER TABLE LIGNECOMMANDES1
-ADD CONSTRAINT lignecommandes1_produits1_fk
-FOREIGN KEY (IDPRODUIT)
-REFERENCES PRODUITS1(IDPRODUIT)
+    ADD CONSTRAINT lignecommandes1_produits1_fk
+    FOREIGN KEY (IDPRODUIT) REFERENCES PRODUITS1(IDPRODUIT);
 
 ALTER TABLE LIGNECOMMANDES1
-ADD CONSTRAINT lignecommandes1_commandes1_fk
-FOREIGN KEY (IDCOMMANDE)
-REFERENCES COMMANDES1(IDCOMMANDE)
+    ADD CONSTRAINT lignecommandes1_commandes1_fk
+    FOREIGN KEY (IDCOMMANDE) REFERENCES COMMANDES1(IDCOMMANDE);
