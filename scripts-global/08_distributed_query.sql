@@ -47,3 +47,11 @@ FROM (
 )
 GROUP  BY IDCATEG
 ORDER  BY CHIFFRE_AFFAIRES_2026 DESC;
+
+-- Sentinel queried by the healthcheck to confirm all init scripts have run.
+-- Site containers depend on this being present before they start.
+CREATE TABLE pdb_admin.INIT_COMPLETE (sentinel VARCHAR2(20));
+INSERT INTO pdb_admin.INIT_COMPLETE VALUES ('READY');
+COMMIT;
+GRANT SELECT ON pdb_admin.INIT_COMPLETE TO s1_user;
+GRANT SELECT ON pdb_admin.INIT_COMPLETE TO s2_user;

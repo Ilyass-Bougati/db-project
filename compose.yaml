@@ -20,7 +20,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "echo 'SELECT 1 FROM DUAL;' | sqlplus -s s1_user/mon_mdp@//localhost:1521/G_PDB > /dev/null 2>&1 || exit 1",
+          "echo 'SELECT sentinel FROM pdb_admin.INIT_COMPLETE WHERE ROWNUM=1;' | sqlplus -s s1_user/mon_mdp@//localhost:1521/G_PDB | grep -q READY || exit 1",
         ]
       interval: 30s
       timeout: 10s
@@ -30,9 +30,9 @@ services:
       resources:
         limits:
           cpus: "1.0"
-          memory: 1500M
+          memory: 2G
         reservations:
-          memory: 1G
+          memory: 1500M
     networks:
       - maroc-db-net
 
@@ -63,6 +63,13 @@ services:
   #     timeout: 10s
   #     retries: 10
   #     start_period: 90s
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: "1.0"
+  #         memory: 2G
+  #       reservations:
+  #         memory: 1500M
   #   networks:
   #     - maroc-db-net
   #   depends_on:
@@ -100,9 +107,9 @@ services:
       resources:
         limits:
           cpus: "1.0"
-          memory: 1500M
+          memory: 2G
         reservations:
-          memory: 1G
+          memory: 1500M
     networks:
       - maroc-db-net
     depends_on:
