@@ -5,11 +5,11 @@ CREATE PLUGGABLE DATABASE G_PDB
   ADMIN USER pdb_admin IDENTIFIED BY Admin123
   ROLES = (DBA)
   DEFAULT TABLESPACE USERS
-    DATAFILE '/opt/oracle/oradata/XE/G_PDB/users01.dbf'
+    DATAFILE '/opt/oracle/oradata/FREE/G_PDB/users01.dbf'
     SIZE 250M AUTOEXTEND ON
   FILE_NAME_CONVERT = (
-    '/opt/oracle/oradata/XE/pdbseed/',
-    '/opt/oracle/oradata/XE/G_PDB/'
+    '/opt/oracle/oradata/FREE/pdbseed/',
+    '/opt/oracle/oradata/FREE/G_PDB/'
   );
 
 -- Open the new PDB

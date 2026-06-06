@@ -5,11 +5,11 @@ CREATE PLUGGABLE DATABASE S2_PDB
   ADMIN USER pdb_admin IDENTIFIED BY Admin123
   ROLES = (DBA)
   DEFAULT TABLESPACE USERS
-    DATAFILE '/opt/oracle/oradata/XE/S2_PDB/users01.dbf'
+    DATAFILE '/opt/oracle/oradata/FREE/S2_PDB/users01.dbf'
     SIZE 250M AUTOEXTEND ON
   FILE_NAME_CONVERT = (
-    '/opt/oracle/oradata/XE/pdbseed/',
-    '/opt/oracle/oradata/XE/S2_PDB/'
+    '/opt/oracle/oradata/FREE/pdbseed/',
+    '/opt/oracle/oradata/FREE/S2_PDB/'
   );
 
 -- Open the new PDB
