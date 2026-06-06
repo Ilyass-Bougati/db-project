@@ -34,3 +34,12 @@ GRANT SELECT ON pdb_admin.COMMANDES      TO s2_user;
 GRANT SELECT ON pdb_admin.PRODUITS       TO s2_user;
 GRANT SELECT ON pdb_admin.LIGNECOMMANDES TO s2_user;
 GRANT CREATE SESSION TO s2_user;
+
+GRANT SELECT ON pdb_admin.CLIENTS        TO b_user;
+GRANT SELECT ON pdb_admin.FOURNISSEURS   TO b_user;
+GRANT SELECT ON pdb_admin.EMPLOYES       TO b_user;
+GRANT SELECT ON pdb_admin.CATEGORIES     TO b_user;
+GRANT SELECT ON pdb_admin.COMMANDES      TO b_user;
+GRANT SELECT ON pdb_admin.PRODUITS       TO b_user;
+GRANT SELECT ON pdb_admin.LIGNECOMMANDES TO b_user;
+GRANT CREATE SESSION TO b_user;

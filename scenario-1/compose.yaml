@@ -1,0 +1,167 @@
+services:
+  db-global:
+    image: gvenzl/oracle-free:23-slim-faststart
+    container_name: oracle-global
+    environment:
+      - ORACLE_PWD=OracleAdmin123!
+      - ORACLE_PASSWORD=admin
+      - APP_USER=mon_user
+      - APP_USER_PASSWORD=mon_mdp
+      - TNS_ADMIN=/opt/oracle/network/admin
+    ports:
+      - "1521:1521"
+    volumes:
+      - global-data:/opt/oracle/oradata
+      - ./global-logs:/opt/oracle/logs
+      - ./scripts-global:/container-entrypoint-initdb.d/
+      - ./tnsnames.ora:/opt/oracle/network/admin/tnsnames.ora
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "echo 'SELECT sentinel FROM pdb_admin.INIT_COMPLETE WHERE ROWNUM=1;' | sqlplus -s s1_user/mon_mdp@//localhost:1521/G_PDB | grep -q READY || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2G
+        reservations:
+          memory: 1500M
+    networks:
+      - maroc-db-net
+
+  db-backup:
+    image: gvenzl/oracle-xe:21-slim-faststart
+    container_name: oracle-backup
+    environment:
+      - ORACLE_PWD=OracleAdmin123!
+      - ORACLE_PASSWORD=admin
+      - APP_USER=mon_user
+      - APP_USER_PASSWORD=mon_mdp
+      - TNS_ADMIN=/opt/oracle/network/admin
+    ports:
+      - "1524:1521"
+    volumes:
+      - backup-data:/opt/oracle/oradata
+      - ./backup-logs:/opt/oracle/logs
+      - ./scripts-backup:/container-entrypoint-initdb.d/
+      - ./tnsnames.ora:/opt/oracle/network/admin/tnsnames.ora
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "echo 'SELECT 1 FROM DUAL;' | sqlplus -s pdb_admin/Admin123@//localhost:1521/B_PDB > /dev/null 2>&1 || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2G
+        reservations:
+          memory: 1500M
+    networks:
+      - maroc-db-net
+    depends_on:
+      db-global:
+        condition: service_healthy
+
+  # db-site-2:
+  #   image: gvenzl/oracle-xe:21-slim-faststart
+  #   container_name: oracle-site-2
+  #   environment:
+  #     - ORACLE_PWD=OracleAdmin123!
+  #     - ORACLE_PASSWORD=admin
+  #     - APP_USER=mon_user
+  #     - APP_USER_PASSWORD=mon_mdp
+  #     - TNS_ADMIN=/opt/oracle/network/admin
+  #   ports:
+  #     - "1523:1521"
+  #   volumes:
+  #     - site-2-data:/opt/oracle/oradata
+  #     - ./site-2-logs:/opt/oracle/logs
+  #     - ./scripts-site-2:/container-entrypoint-initdb.d/
+  #     - ./tnsnames.ora:/opt/oracle/network/admin/tnsnames.ora
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test:
+  #       [
+  #         "CMD-SHELL",
+  #         "echo 'SELECT 1 FROM DUAL;' | sqlplus -s s1_user/mon_mdp@//localhost:1521/S2_PDB > /dev/null 2>&1 || exit 1",
+  #       ]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 10
+  #     start_period: 90s
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: "1.0"
+  #         memory: 2G
+  #       reservations:
+  #         memory: 1500M
+  #   networks:
+  #     - maroc-db-net
+  #   depends_on:
+  #     db-global:
+  #       condition: service_healthy
+
+  db-site-1:
+    image: gvenzl/oracle-xe:21-slim-faststart
+    container_name: oracle-site-1
+    environment:
+      - ORACLE_PWD=OracleAdmin123!
+      - ORACLE_PASSWORD=admin
+      - APP_USER=mon_user
+      - APP_USER_PASSWORD=mon_mdp
+      - TNS_ADMIN=/opt/oracle/network/admin
+    ports:
+      - "1522:1521"
+    volumes:
+      - site-1-data:/opt/oracle/oradata
+      - ./site-1-logs:/opt/oracle/logs
+      - ./scripts-site-1:/container-entrypoint-initdb.d/
+      - ./tnsnames.ora:/opt/oracle/network/admin/tnsnames.ora
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "echo 'SELECT 1 FROM DUAL;' | sqlplus -s s1_user/mon_mdp@//localhost:1521/S1_PDB > /dev/null 2>&1 || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2G
+        reservations:
+          memory: 1500M
+    networks:
+      - maroc-db-net
+    depends_on:
+      db-global:
+        condition: service_healthy
+
+volumes:
+  site-2-data:
+  global-data:
+  site-1-data:
+  backup-data:
+
+networks:
+  maroc-db-net:
+    driver: bridge
