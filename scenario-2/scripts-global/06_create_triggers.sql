@@ -11,8 +11,8 @@
 -- lookup is needed — QUANTITE is a direct column on the row.
 -- =============================================================
 
-ALTER SESSION SET CONTAINER = G_PDB;
-ALTER SESSION SET CURRENT_SCHEMA = pdb_admin;
+-- Connect as pdb_admin so DB links are created in pdb_admin's schema.
+CONNECT pdb_admin/Admin123@//localhost:1521/G_PDB
 
 -- =============================================================
 -- Database links from the global DB to each site
@@ -39,6 +39,11 @@ CREATE DATABASE LINK link_to_site2
 -- QUANTITE >= 100 → Site 1 (gros volumes)
 -- QUANTITE <  100 → Site 2 (petits volumes)
 --
+-- Remote calls use EXECUTE IMMEDIATE to defer resolution to
+-- runtime. Oracle 23c validates remote procedure references at
+-- compile time; since the site containers start after the global,
+-- a direct call would fail compilation with PLS-00352.
+--
 -- Because the partition is exhaustive and disjoint, exactly one
 -- of the two branches always executes — no row is ever dropped
 -- and no row ever goes to both sites.
@@ -50,21 +55,11 @@ DECLARE
     PRAGMA AUTONOMOUS_TRANSACTION;
 BEGIN
     IF :NEW.QUANTITE >= 100 THEN
-        pdb_admin.insertligne@link_to_site1(
-            :NEW.IDLIGNECOMMANDE,
-            :NEW.IDCOMMANDE,
-            :NEW.IDPRODUIT,
-            :NEW.QUANTITE,
-            :NEW.REMISE
-        );
+        EXECUTE IMMEDIATE 'BEGIN pdb_admin.insertligne@link_to_site1(:1,:2,:3,:4,:5); END;'
+            USING :NEW.IDLIGNECOMMANDE, :NEW.IDCOMMANDE, :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE;
     ELSE
-        pdb_admin.insertligne@link_to_site2(
-            :NEW.IDLIGNECOMMANDE,
-            :NEW.IDCOMMANDE,
-            :NEW.IDPRODUIT,
-            :NEW.QUANTITE,
-            :NEW.REMISE
-        );
+        EXECUTE IMMEDIATE 'BEGIN pdb_admin.insertligne@link_to_site2(:1,:2,:3,:4,:5); END;'
+            USING :NEW.IDLIGNECOMMANDE, :NEW.IDCOMMANDE, :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE;
     END IF;
 EXCEPTION
     WHEN OTHERS THEN
@@ -84,9 +79,11 @@ DECLARE
     PRAGMA AUTONOMOUS_TRANSACTION;
 BEGIN
     IF :OLD.QUANTITE >= 100 THEN
-        pdb_admin.deleteligne@link_to_site1(:OLD.IDLIGNECOMMANDE);
+        EXECUTE IMMEDIATE 'BEGIN pdb_admin.deleteligne@link_to_site1(:1); END;'
+            USING :OLD.IDLIGNECOMMANDE;
     ELSE
-        pdb_admin.deleteligne@link_to_site2(:OLD.IDLIGNECOMMANDE);
+        EXECUTE IMMEDIATE 'BEGIN pdb_admin.deleteligne@link_to_site2(:1); END;'
+            USING :OLD.IDLIGNECOMMANDE;
     END IF;
 EXCEPTION
     WHEN OTHERS THEN
@@ -118,28 +115,24 @@ BEGIN
 
     IF v_was_s1 AND v_is_s1 THEN
         -- Row stays in Site 1
-        pdb_admin.updateligne@link_to_site1(
-            :NEW.IDLIGNECOMMANDE, :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE
-        );
+        EXECUTE IMMEDIATE 'BEGIN pdb_admin.updateligne@link_to_site1(:1,:2,:3,:4); END;'
+            USING :NEW.IDLIGNECOMMANDE, :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE;
     ELSIF v_was_s1 AND NOT v_is_s1 THEN
         -- Row moves from Site 1 to Site 2
-        pdb_admin.deleteligne@link_to_site1(:OLD.IDLIGNECOMMANDE);
-        pdb_admin.insertligne@link_to_site2(
-            :NEW.IDLIGNECOMMANDE, :NEW.IDCOMMANDE,
-            :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE
-        );
+        EXECUTE IMMEDIATE 'BEGIN pdb_admin.deleteligne@link_to_site1(:1); END;'
+            USING :OLD.IDLIGNECOMMANDE;
+        EXECUTE IMMEDIATE 'BEGIN pdb_admin.insertligne@link_to_site2(:1,:2,:3,:4,:5); END;'
+            USING :NEW.IDLIGNECOMMANDE, :NEW.IDCOMMANDE, :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE;
     ELSIF NOT v_was_s1 AND v_is_s1 THEN
         -- Row moves from Site 2 to Site 1
-        pdb_admin.deleteligne@link_to_site2(:OLD.IDLIGNECOMMANDE);
-        pdb_admin.insertligne@link_to_site1(
-            :NEW.IDLIGNECOMMANDE, :NEW.IDCOMMANDE,
-            :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE
-        );
+        EXECUTE IMMEDIATE 'BEGIN pdb_admin.deleteligne@link_to_site2(:1); END;'
+            USING :OLD.IDLIGNECOMMANDE;
+        EXECUTE IMMEDIATE 'BEGIN pdb_admin.insertligne@link_to_site1(:1,:2,:3,:4,:5); END;'
+            USING :NEW.IDLIGNECOMMANDE, :NEW.IDCOMMANDE, :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE;
     ELSE
         -- Row stays in Site 2
-        pdb_admin.updateligne@link_to_site2(
-            :NEW.IDLIGNECOMMANDE, :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE
-        );
+        EXECUTE IMMEDIATE 'BEGIN pdb_admin.updateligne@link_to_site2(:1,:2,:3,:4); END;'
+            USING :NEW.IDLIGNECOMMANDE, :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE;
     END IF;
 EXCEPTION
     WHEN OTHERS THEN

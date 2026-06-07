@@ -8,16 +8,10 @@ CONNECT pdb_admin/Admin123@//localhost:1521/S1_PDB;
 -- PROCEDURE: insertligne
 -- Inserts a new row into LIGNECOMMANDES1.
 --
--- Before inserting, the procedure explicitly checks referential
--- integrity so that a meaningful error is raised rather than a
--- raw Oracle constraint violation.
---
--- Arguments:
---   p_idlignecommande  PK of the new order line
---   p_idcommande       Must exist in COMMANDES1
---   p_idproduit        Must exist in PRODUITS1
---   p_quantite         Ordered quantity
---   p_remise           Discount (0..1)
+-- Before inserting the order line, the procedure ensures all
+-- parent rows (PRODUIT, COMMANDE, CLIENT) exist in this fragment.
+-- Any that are missing are pulled from the global DB via the
+-- PRODUITS / COMMANDES / CLIENTS synonyms (→ link_to_global).
 -- =============================================================
 CREATE OR REPLACE PROCEDURE insertligne (
     p_idlignecommande IN LIGNECOMMANDES1.IDLIGNECOMMANDE%TYPE,
@@ -27,28 +21,28 @@ CREATE OR REPLACE PROCEDURE insertligne (
     p_remise          IN LIGNECOMMANDES1.REMISE%TYPE
 )
 IS
-    v_count INTEGER;
+    v_count    INTEGER;
+    v_idclient COMMANDES1.IDCLIENT%TYPE;
 BEGIN
-    -- Verify parent order exists in this fragment
-    SELECT COUNT(*) INTO v_count
-    FROM   COMMANDES1
-    WHERE  IDCOMMANDE = p_idcommande;
-
+    -- Ensure PRODUIT exists in this fragment; pull from global if not
+    SELECT COUNT(*) INTO v_count FROM PRODUITS1 WHERE IDPRODUIT = p_idproduit;
     IF v_count = 0 THEN
-        RAISE_APPLICATION_ERROR(-20001,
-            'insertligne [S1]: IDCOMMANDE=' || p_idcommande
-            || ' does not exist in COMMANDES1.');
+        INSERT INTO PRODUITS1 SELECT * FROM PRODUITS WHERE IDPRODUIT = p_idproduit;
     END IF;
 
-    -- Verify product exists in this fragment
-    SELECT COUNT(*) INTO v_count
-    FROM   PRODUITS1
-    WHERE  IDPRODUIT = p_idproduit;
-
+    -- Ensure COMMANDE (and its CLIENT) exist in this fragment
+    SELECT COUNT(*) INTO v_count FROM COMMANDES1 WHERE IDCOMMANDE = p_idcommande;
     IF v_count = 0 THEN
-        RAISE_APPLICATION_ERROR(-20002,
-            'insertligne [S1]: IDPRODUIT=' || p_idproduit
-            || ' does not exist in PRODUITS1.');
+        -- Resolve the client for this order from the global DB
+        SELECT IDCLIENT INTO v_idclient FROM COMMANDES WHERE IDCOMMANDE = p_idcommande;
+
+        -- Ensure CLIENT exists in this fragment; pull from global if not
+        SELECT COUNT(*) INTO v_count FROM CLIENTS1 WHERE IDCLIENT = v_idclient;
+        IF v_count = 0 THEN
+            INSERT INTO CLIENTS1 SELECT * FROM CLIENTS WHERE IDCLIENT = v_idclient;
+        END IF;
+
+        INSERT INTO COMMANDES1 SELECT * FROM COMMANDES WHERE IDCOMMANDE = p_idcommande;
     END IF;
 
     INSERT INTO LIGNECOMMANDES1 (IDLIGNECOMMANDE, IDCOMMANDE, IDPRODUIT, QUANTITE, REMISE)
@@ -74,9 +68,6 @@ END insertligne;
 --
 -- PRODUITS1 is NOT touched: products are master data shared
 -- across many order lines.
---
--- Arguments:
---   p_idlignecommande  PK of the order line to remove
 -- =============================================================
 CREATE OR REPLACE PROCEDURE deleteligne (
     p_idlignecommande IN LIGNECOMMANDES1.IDLIGNECOMMANDE%TYPE
@@ -86,7 +77,6 @@ IS
     v_idclient   COMMANDES1.IDCLIENT%TYPE;
     v_count      INTEGER;
 BEGIN
-    -- Fetch parent IDs before deletion so we can do orphan checks afterward
     SELECT IDCOMMANDE INTO v_idcommande
     FROM   LIGNECOMMANDES1
     WHERE  IDLIGNECOMMANDE = p_idlignecommande;
@@ -95,11 +85,9 @@ BEGIN
     FROM   COMMANDES1
     WHERE  IDCOMMANDE = v_idcommande;
 
-    -- Delete the target line
     DELETE FROM LIGNECOMMANDES1
     WHERE  IDLIGNECOMMANDE = p_idlignecommande;
 
-    -- Check if the parent order now has no remaining lines
     SELECT COUNT(*) INTO v_count
     FROM   LIGNECOMMANDES1
     WHERE  IDCOMMANDE = v_idcommande;
@@ -107,7 +95,6 @@ BEGIN
     IF v_count = 0 THEN
         DELETE FROM COMMANDES1 WHERE IDCOMMANDE = v_idcommande;
 
-        -- Check if the parent client now has no remaining orders
         SELECT COUNT(*) INTO v_count
         FROM   COMMANDES1
         WHERE  IDCLIENT = v_idclient;
@@ -134,14 +121,10 @@ END deleteligne;
 -- =============================================================
 -- PROCEDURE: updateligne
 -- Updates IDPRODUIT, QUANTITE, and REMISE for an existing row
--- in LIGNECOMMANDES1.  Only these three columns are in scope
--- per the project specification.
+-- in LIGNECOMMANDES1.
 --
--- Arguments:
---   p_idlignecommande  PK of the line to update
---   p_idproduit        New product (must exist in PRODUITS1)
---   p_quantite         New quantity
---   p_remise           New discount (0..1)
+-- If the new product is not yet in PRODUITS1, it is pulled from
+-- the global DB before the update.
 -- =============================================================
 CREATE OR REPLACE PROCEDURE updateligne (
     p_idlignecommande IN LIGNECOMMANDES1.IDLIGNECOMMANDE%TYPE,
@@ -152,7 +135,6 @@ CREATE OR REPLACE PROCEDURE updateligne (
 IS
     v_count INTEGER;
 BEGIN
-    -- Verify the target line exists
     SELECT COUNT(*) INTO v_count
     FROM   LIGNECOMMANDES1
     WHERE  IDLIGNECOMMANDE = p_idlignecommande;
@@ -163,15 +145,10 @@ BEGIN
             || ' does not exist in LIGNECOMMANDES1.');
     END IF;
 
-    -- Verify the new product belongs to this fragment
-    SELECT COUNT(*) INTO v_count
-    FROM   PRODUITS1
-    WHERE  IDPRODUIT = p_idproduit;
-
+    -- Ensure PRODUIT exists in this fragment; pull from global if not
+    SELECT COUNT(*) INTO v_count FROM PRODUITS1 WHERE IDPRODUIT = p_idproduit;
     IF v_count = 0 THEN
-        RAISE_APPLICATION_ERROR(-20002,
-            'updateligne [S1]: IDPRODUIT=' || p_idproduit
-            || ' does not exist in PRODUITS1.');
+        INSERT INTO PRODUITS1 SELECT * FROM PRODUITS WHERE IDPRODUIT = p_idproduit;
     END IF;
 
     UPDATE LIGNECOMMANDES1
@@ -190,12 +167,7 @@ END updateligne;
 /
 
 -- =============================================================
--- Grants for g_user
--- g_user is the account used by the global DB database link.
--- It needs:
---   - CREATE SESSION to open a connection
---   - EXECUTE on each procedure so the sync triggers can call them
---   - SELECT on the fragment tables for the distributed query (Q6)
+-- Grants for g_user (used by the global DB's database link)
 -- =============================================================
 GRANT CREATE SESSION TO g_user;
 

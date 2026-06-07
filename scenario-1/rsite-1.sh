@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-docker stop oracle-site-1
-docker rm oracle-site-1
-docker volume rm ilyass_site-1-data
-docker compose up -d
+docker compose stop db-site-1
+docker compose rm -f db-site-1
+docker volume rm scenario-1_site-1-data
+docker compose up -d db-site-1

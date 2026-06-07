@@ -12,17 +12,13 @@
 -- looks it up from PRODUITS using the row's IDPRODUIT.
 -- =============================================================
 
-ALTER SESSION SET CONTAINER = G_PDB;
-ALTER SESSION SET CURRENT_SCHEMA = pdb_admin;
+-- Connect as pdb_admin so DB links are created in pdb_admin's schema.
+-- (ALTER SESSION SET CURRENT_SCHEMA does not affect DB link ownership —
+-- links always belong to the session user, which would be SYS otherwise.)
+CONNECT pdb_admin/Admin123@//localhost:1521/G_PDB
 
 -- =============================================================
 -- Database links from the global DB to each site
---
--- g_user is a dedicated cross-site connector account that exists
--- in both S1_PDB and S2_PDB.  It has CREATE SESSION and EXECUTE
--- on the insertligne / deleteligne / updateligne procedures, and
--- SELECT on the fragment tables (granted in the site procedure
--- scripts).
 -- =============================================================
 
 -- Drop existing links so this script is safe to re-run
@@ -45,6 +41,11 @@ CREATE DATABASE LINK link_to_site2
 -- TRIGGER: SYC_INSERT_LIGNE
 -- Fires after every INSERT on LIGNECOMMANDES.
 -- Routes the new row to the matching site fragment (if any).
+--
+-- Remote calls use EXECUTE IMMEDIATE to defer resolution to
+-- runtime. Oracle 23c validates remote procedure references at
+-- compile time; since the site containers start after the global,
+-- a direct call would fail compilation with PLS-00352.
 --
 -- PRAGMA AUTONOMOUS_TRANSACTION is required because the site
 -- procedures issue a COMMIT.  Without it Oracle would raise
@@ -69,24 +70,14 @@ BEGIN
 
     -- Route to Site 1 if the row matches R1
     IF v_idcateg = 50 AND :NEW.QUANTITE > 100 THEN
-        pdb_admin.insertligne@link_to_site1(
-            :NEW.IDLIGNECOMMANDE,
-            :NEW.IDCOMMANDE,
-            :NEW.IDPRODUIT,
-            :NEW.QUANTITE,
-            :NEW.REMISE
-        );
+        EXECUTE IMMEDIATE 'BEGIN pdb_admin.insertligne@link_to_site1(:1,:2,:3,:4,:5); END;'
+            USING :NEW.IDLIGNECOMMANDE, :NEW.IDCOMMANDE, :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE;
     END IF;
 
     -- Route to Site 2 if the row matches R2
     IF v_idcateg = 35 AND :NEW.QUANTITE > 50 THEN
-        pdb_admin.insertligne@link_to_site2(
-            :NEW.IDLIGNECOMMANDE,
-            :NEW.IDCOMMANDE,
-            :NEW.IDPRODUIT,
-            :NEW.QUANTITE,
-            :NEW.REMISE
-        );
+        EXECUTE IMMEDIATE 'BEGIN pdb_admin.insertligne@link_to_site2(:1,:2,:3,:4,:5); END;'
+            USING :NEW.IDLIGNECOMMANDE, :NEW.IDCOMMANDE, :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE;
     END IF;
 
 EXCEPTION
@@ -119,12 +110,14 @@ BEGIN
 
     -- Remove from Site 1 if the deleted row matched R1
     IF v_idcateg = 50 AND :OLD.QUANTITE > 100 THEN
-        pdb_admin.deleteligne@link_to_site1(:OLD.IDLIGNECOMMANDE);
+        EXECUTE IMMEDIATE 'BEGIN pdb_admin.deleteligne@link_to_site1(:1); END;'
+            USING :OLD.IDLIGNECOMMANDE;
     END IF;
 
     -- Remove from Site 2 if the deleted row matched R2
     IF v_idcateg = 35 AND :OLD.QUANTITE > 50 THEN
-        pdb_admin.deleteligne@link_to_site2(:OLD.IDLIGNECOMMANDE);
+        EXECUTE IMMEDIATE 'BEGIN pdb_admin.deleteligne@link_to_site2(:1); END;'
+            USING :OLD.IDLIGNECOMMANDE;
     END IF;
 
 EXCEPTION
@@ -171,32 +164,28 @@ BEGIN
     -- ---- Site 1 ----
     IF v_in_s1_old AND v_in_s1_new THEN
         -- Row stays in Site 1: update the existing fragment row
-        pdb_admin.updateligne@link_to_site1(
-            :NEW.IDLIGNECOMMANDE, :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE
-        );
+        EXECUTE IMMEDIATE 'BEGIN pdb_admin.updateligne@link_to_site1(:1,:2,:3,:4); END;'
+            USING :NEW.IDLIGNECOMMANDE, :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE;
     ELSIF v_in_s1_old AND NOT v_in_s1_new THEN
         -- Row no longer matches R1: remove it from Site 1
-        pdb_admin.deleteligne@link_to_site1(:OLD.IDLIGNECOMMANDE);
+        EXECUTE IMMEDIATE 'BEGIN pdb_admin.deleteligne@link_to_site1(:1); END;'
+            USING :OLD.IDLIGNECOMMANDE;
     ELSIF NOT v_in_s1_old AND v_in_s1_new THEN
         -- Row now matches R1: add it to Site 1
-        pdb_admin.insertligne@link_to_site1(
-            :NEW.IDLIGNECOMMANDE, :NEW.IDCOMMANDE,
-            :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE
-        );
+        EXECUTE IMMEDIATE 'BEGIN pdb_admin.insertligne@link_to_site1(:1,:2,:3,:4,:5); END;'
+            USING :NEW.IDLIGNECOMMANDE, :NEW.IDCOMMANDE, :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE;
     END IF;
 
     -- ---- Site 2 ----
     IF v_in_s2_old AND v_in_s2_new THEN
-        pdb_admin.updateligne@link_to_site2(
-            :NEW.IDLIGNECOMMANDE, :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE
-        );
+        EXECUTE IMMEDIATE 'BEGIN pdb_admin.updateligne@link_to_site2(:1,:2,:3,:4); END;'
+            USING :NEW.IDLIGNECOMMANDE, :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE;
     ELSIF v_in_s2_old AND NOT v_in_s2_new THEN
-        pdb_admin.deleteligne@link_to_site2(:OLD.IDLIGNECOMMANDE);
+        EXECUTE IMMEDIATE 'BEGIN pdb_admin.deleteligne@link_to_site2(:1); END;'
+            USING :OLD.IDLIGNECOMMANDE;
     ELSIF NOT v_in_s2_old AND v_in_s2_new THEN
-        pdb_admin.insertligne@link_to_site2(
-            :NEW.IDLIGNECOMMANDE, :NEW.IDCOMMANDE,
-            :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE
-        );
+        EXECUTE IMMEDIATE 'BEGIN pdb_admin.insertligne@link_to_site2(:1,:2,:3,:4,:5); END;'
+            USING :NEW.IDLIGNECOMMANDE, :NEW.IDCOMMANDE, :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE;
     END IF;
 
 EXCEPTION

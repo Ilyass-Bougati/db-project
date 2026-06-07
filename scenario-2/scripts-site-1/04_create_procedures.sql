@@ -11,12 +11,10 @@ CONNECT pdb_admin/Admin123@//localhost:1521/S1_PDB;
 -- The global SYC_INSERT_LIGNE trigger guarantees that this
 -- procedure is only called for rows with QUANTITE >= 100.
 --
--- Arguments:
---   p_idlignecommande  PK of the new order line
---   p_idcommande       Must exist in COMMANDES1
---   p_idproduit        Must exist in PRODUITS1
---   p_quantite         Ordered quantity (>= 100 by contract)
---   p_remise           Discount (0..1)
+-- Before inserting the order line, the procedure ensures all
+-- parent rows (PRODUIT, COMMANDE, CLIENT) exist in this fragment.
+-- Any that are missing are pulled from the global DB via the
+-- PRODUITS / COMMANDES / CLIENTS synonyms (→ link_to_global).
 -- =============================================================
 CREATE OR REPLACE PROCEDURE insertligne (
     p_idlignecommande IN LIGNECOMMANDES1.IDLIGNECOMMANDE%TYPE,
@@ -26,26 +24,28 @@ CREATE OR REPLACE PROCEDURE insertligne (
     p_remise          IN LIGNECOMMANDES1.REMISE%TYPE
 )
 IS
-    v_count INTEGER;
+    v_count    INTEGER;
+    v_idclient COMMANDES1.IDCLIENT%TYPE;
 BEGIN
-    SELECT COUNT(*) INTO v_count
-    FROM   COMMANDES1
-    WHERE  IDCOMMANDE = p_idcommande;
-
+    -- Ensure PRODUIT exists in this fragment; pull from global if not
+    SELECT COUNT(*) INTO v_count FROM PRODUITS1 WHERE IDPRODUIT = p_idproduit;
     IF v_count = 0 THEN
-        RAISE_APPLICATION_ERROR(-20001,
-            'insertligne [S1]: IDCOMMANDE=' || p_idcommande
-            || ' does not exist in COMMANDES1.');
+        INSERT INTO PRODUITS1 SELECT * FROM PRODUITS WHERE IDPRODUIT = p_idproduit;
     END IF;
 
-    SELECT COUNT(*) INTO v_count
-    FROM   PRODUITS1
-    WHERE  IDPRODUIT = p_idproduit;
-
+    -- Ensure COMMANDE (and its CLIENT) exist in this fragment
+    SELECT COUNT(*) INTO v_count FROM COMMANDES1 WHERE IDCOMMANDE = p_idcommande;
     IF v_count = 0 THEN
-        RAISE_APPLICATION_ERROR(-20002,
-            'insertligne [S1]: IDPRODUIT=' || p_idproduit
-            || ' does not exist in PRODUITS1.');
+        -- Resolve the client for this order from the global DB
+        SELECT IDCLIENT INTO v_idclient FROM COMMANDES WHERE IDCOMMANDE = p_idcommande;
+
+        -- Ensure CLIENT exists in this fragment; pull from global if not
+        SELECT COUNT(*) INTO v_count FROM CLIENTS1 WHERE IDCLIENT = v_idclient;
+        IF v_count = 0 THEN
+            INSERT INTO CLIENTS1 SELECT * FROM CLIENTS WHERE IDCLIENT = v_idclient;
+        END IF;
+
+        INSERT INTO COMMANDES1 SELECT * FROM COMMANDES WHERE IDCOMMANDE = p_idcommande;
     END IF;
 
     INSERT INTO LIGNECOMMANDES1 (IDLIGNECOMMANDE, IDCOMMANDE, IDPRODUIT, QUANTITE, REMISE)
@@ -64,10 +64,8 @@ END insertligne;
 -- PROCEDURE: deleteligne
 -- Deletes a row from LIGNECOMMANDES1 by PK, then cascades
 -- upward to remove orphaned COMMANDES1 / CLIENTS1 rows.
--- PRODUITS1 is not touched (product master data).
---
--- Arguments:
---   p_idlignecommande  PK of the order line to remove
+-- PRODUITS1 is NOT touched: products are master data shared
+-- across many order lines.
 -- =============================================================
 CREATE OR REPLACE PROCEDURE deleteligne (
     p_idlignecommande IN LIGNECOMMANDES1.IDLIGNECOMMANDE%TYPE
@@ -125,14 +123,11 @@ END deleteligne;
 --
 -- The global SYC_UPDATE_LIGNE trigger only calls this procedure
 -- when the row stays in Site 1 (old QUANTITE >= 100 AND new
--- QUANTITE >= 100).  Cross-boundary updates are handled by the
+-- QUANTITE >= 100). Cross-boundary updates are handled by the
 -- trigger via deleteligne + insertligne.
 --
--- Arguments:
---   p_idlignecommande  PK of the line to update
---   p_idproduit        New product (must exist in PRODUITS1)
---   p_quantite         New quantity (>= 100 by caller contract)
---   p_remise           New discount (0..1)
+-- If the new product is not yet in PRODUITS1, it is pulled from
+-- the global DB before the update.
 -- =============================================================
 CREATE OR REPLACE PROCEDURE updateligne (
     p_idlignecommande IN LIGNECOMMANDES1.IDLIGNECOMMANDE%TYPE,
@@ -153,14 +148,10 @@ BEGIN
             || ' does not exist in LIGNECOMMANDES1.');
     END IF;
 
-    SELECT COUNT(*) INTO v_count
-    FROM   PRODUITS1
-    WHERE  IDPRODUIT = p_idproduit;
-
+    -- Ensure PRODUIT exists in this fragment; pull from global if not
+    SELECT COUNT(*) INTO v_count FROM PRODUITS1 WHERE IDPRODUIT = p_idproduit;
     IF v_count = 0 THEN
-        RAISE_APPLICATION_ERROR(-20002,
-            'updateligne [S1]: IDPRODUIT=' || p_idproduit
-            || ' does not exist in PRODUITS1.');
+        INSERT INTO PRODUITS1 SELECT * FROM PRODUITS WHERE IDPRODUIT = p_idproduit;
     END IF;
 
     UPDATE LIGNECOMMANDES1

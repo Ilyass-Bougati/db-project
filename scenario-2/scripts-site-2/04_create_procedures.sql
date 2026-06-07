@@ -12,6 +12,11 @@ CONNECT pdb_admin/Admin123@//localhost:1521/S2_PDB;
 -- Inserts a new row into LIGNECOMMANDES2.
 -- The global SYC_INSERT_LIGNE trigger guarantees that this
 -- procedure is only called for rows with QUANTITE < 100.
+--
+-- Before inserting the order line, the procedure ensures all
+-- parent rows (PRODUIT, COMMANDE, CLIENT) exist in this fragment.
+-- Any that are missing are pulled from the global DB via the
+-- PRODUITS / COMMANDES / CLIENTS synonyms (→ link_to_global).
 -- =============================================================
 CREATE OR REPLACE PROCEDURE insertligne (
     p_idlignecommande IN LIGNECOMMANDES2.IDLIGNECOMMANDE%TYPE,
@@ -21,26 +26,28 @@ CREATE OR REPLACE PROCEDURE insertligne (
     p_remise          IN LIGNECOMMANDES2.REMISE%TYPE
 )
 IS
-    v_count INTEGER;
+    v_count    INTEGER;
+    v_idclient COMMANDES2.IDCLIENT%TYPE;
 BEGIN
-    SELECT COUNT(*) INTO v_count
-    FROM   COMMANDES2
-    WHERE  IDCOMMANDE = p_idcommande;
-
+    -- Ensure PRODUIT exists in this fragment; pull from global if not
+    SELECT COUNT(*) INTO v_count FROM PRODUITS2 WHERE IDPRODUIT = p_idproduit;
     IF v_count = 0 THEN
-        RAISE_APPLICATION_ERROR(-20001,
-            'insertligne [S2]: IDCOMMANDE=' || p_idcommande
-            || ' does not exist in COMMANDES2.');
+        INSERT INTO PRODUITS2 SELECT * FROM PRODUITS WHERE IDPRODUIT = p_idproduit;
     END IF;
 
-    SELECT COUNT(*) INTO v_count
-    FROM   PRODUITS2
-    WHERE  IDPRODUIT = p_idproduit;
-
+    -- Ensure COMMANDE (and its CLIENT) exist in this fragment
+    SELECT COUNT(*) INTO v_count FROM COMMANDES2 WHERE IDCOMMANDE = p_idcommande;
     IF v_count = 0 THEN
-        RAISE_APPLICATION_ERROR(-20002,
-            'insertligne [S2]: IDPRODUIT=' || p_idproduit
-            || ' does not exist in PRODUITS2.');
+        -- Resolve the client for this order from the global DB
+        SELECT IDCLIENT INTO v_idclient FROM COMMANDES WHERE IDCOMMANDE = p_idcommande;
+
+        -- Ensure CLIENT exists in this fragment; pull from global if not
+        SELECT COUNT(*) INTO v_count FROM CLIENTS2 WHERE IDCLIENT = v_idclient;
+        IF v_count = 0 THEN
+            INSERT INTO CLIENTS2 SELECT * FROM CLIENTS WHERE IDCLIENT = v_idclient;
+        END IF;
+
+        INSERT INTO COMMANDES2 SELECT * FROM COMMANDES WHERE IDCOMMANDE = p_idcommande;
     END IF;
 
     INSERT INTO LIGNECOMMANDES2 (IDLIGNECOMMANDE, IDCOMMANDE, IDPRODUIT, QUANTITE, REMISE)
@@ -59,6 +66,8 @@ END insertligne;
 -- PROCEDURE: deleteligne
 -- Deletes a row from LIGNECOMMANDES2 by PK, then cascades
 -- upward to remove orphaned COMMANDES2 / CLIENTS2 rows.
+-- PRODUITS2 is NOT touched: products are master data shared
+-- across many order lines.
 -- =============================================================
 CREATE OR REPLACE PROCEDURE deleteligne (
     p_idlignecommande IN LIGNECOMMANDES2.IDLIGNECOMMANDE%TYPE
@@ -116,7 +125,11 @@ END deleteligne;
 --
 -- The global SYC_UPDATE_LIGNE trigger only calls this procedure
 -- when the row stays in Site 2 (old QUANTITE < 100 AND new
--- QUANTITE < 100).
+-- QUANTITE < 100). Cross-boundary updates are handled by the
+-- trigger via deleteligne + insertligne.
+--
+-- If the new product is not yet in PRODUITS2, it is pulled from
+-- the global DB before the update.
 -- =============================================================
 CREATE OR REPLACE PROCEDURE updateligne (
     p_idlignecommande IN LIGNECOMMANDES2.IDLIGNECOMMANDE%TYPE,
@@ -137,14 +150,10 @@ BEGIN
             || ' does not exist in LIGNECOMMANDES2.');
     END IF;
 
-    SELECT COUNT(*) INTO v_count
-    FROM   PRODUITS2
-    WHERE  IDPRODUIT = p_idproduit;
-
+    -- Ensure PRODUIT exists in this fragment; pull from global if not
+    SELECT COUNT(*) INTO v_count FROM PRODUITS2 WHERE IDPRODUIT = p_idproduit;
     IF v_count = 0 THEN
-        RAISE_APPLICATION_ERROR(-20002,
-            'updateligne [S2]: IDPRODUIT=' || p_idproduit
-            || ' does not exist in PRODUITS2.');
+        INSERT INTO PRODUITS2 SELECT * FROM PRODUITS WHERE IDPRODUIT = p_idproduit;
     END IF;
 
     UPDATE LIGNECOMMANDES2

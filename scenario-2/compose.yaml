@@ -37,7 +37,7 @@ services:
       - s2-db-net
 
   db-site-1:
-    image: gvenzl/oracle-xe:21-slim-faststart
+    image: gvenzl/oracle-free:23-slim-faststart
     container_name: s2-oracle-site-1
     environment:
       - ORACLE_PWD=OracleAdmin123!
@@ -77,7 +77,7 @@ services:
         condition: service_healthy
 
   db-site-2:
-    image: gvenzl/oracle-xe:21-slim-faststart
+    image: gvenzl/oracle-free:23-slim-faststart
     container_name: s2-oracle-site-2
     environment:
       - ORACLE_PWD=OracleAdmin123!
