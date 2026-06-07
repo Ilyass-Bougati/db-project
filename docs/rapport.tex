@@ -1,0 +1,1373 @@
+% ============================================================================
+%  Rapport technique — Système de bases de données réparties « EShop »
+%
+%  Compilation (pdfLaTeX, deux passes pour la table des matières) :
+%      pdflatex rapport.tex
+%      pdflatex rapport.tex
+%
+%  Paquets requis (TeX Live « full » ou installation à la carte) :
+%      inputenc, fontenc, lmodern, babel (french), geometry, xcolor,
+%      listings, graphicx, booktabs, enumitem, microtype, fancyhdr,
+%      tikz (+ arrows.meta), hyperref
+%
+%  Sur Debian/Ubuntu :  sudo apt install texlive-full
+%  ou, minimal :        texlive-latex-recommended texlive-latex-extra
+%                       texlive-lang-french texlive-pictures
+% ============================================================================
+\documentclass[11pt,a4paper]{article}
+
+% --- Encodage et police -----------------------------------------------------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[french]{babel}
+\usepackage{microtype}
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+% --- Mise en page -----------------------------------------------------------
+\usepackage[a4paper,margin=2.4cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+
+% --- Schémas ----------------------------------------------------------------
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta}
+
+% --- Captures d'écran (emplacements réservés) -------------------------------
+% Utilisation :  \screenshot{captures/mon-image.png}{légende de remplacement}
+% Si le fichier existe, il est inséré ; sinon un cadre indiquant le chemin
+% attendu s'affiche, ce qui permet de compiler le rapport avant d'avoir pris
+% les captures. Déposez les images dans docs/captures/ puis recompilez.
+\newcommand{\screenshot}[2]{%
+  \IfFileExists{#1}{%
+    \includegraphics[width=0.95\linewidth]{#1}%
+  }{%
+    \fbox{\begin{minipage}[c][5cm][c]{0.9\linewidth}%
+      \centering\itshape\color{cmt}%
+      [\,capture à insérer\,]\\[6pt]
+      Fichier attendu : \texttt{#1}\\[6pt]
+      #2%
+    \end{minipage}}%
+  }%
+}
+
+% --- Couleurs du thème ------------------------------------------------------
+\definecolor{codebg}{RGB}{248,249,250}
+\definecolor{codeframe}{RGB}{222,226,230}
+\definecolor{kw}{RGB}{0,92,197}
+\definecolor{cmt}{RGB}{106,115,125}
+\definecolor{str}{RGB}{163,21,21}
+\definecolor{num}{RGB}{0,108,156}
+\definecolor{accent}{RGB}{0,86,179}
+\definecolor{glob}{RGB}{219,234,254}
+\definecolor{site}{RGB}{255,237,213}
+\definecolor{bkp}{RGB}{220,242,228}
+\definecolor{dash}{RGB}{236,238,240}
+
+% --- Extraits de code (listings) -------------------------------------------
+\usepackage{listings}
+\renewcommand{\lstlistingname}{Extrait}
+\renewcommand{\lstlistlistingname}{Liste des extraits de code}
+
+\lstdefinestyle{base}{
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{kw}\bfseries,
+  commentstyle=\color{cmt}\itshape,
+  stringstyle=\color{str},
+  numberstyle=\tiny\color{cmt},
+  numbers=left,
+  numbersep=9pt,
+  frame=single,
+  rulecolor=\color{codeframe},
+  framesep=6pt,
+  xleftmargin=16pt,
+  xrightmargin=4pt,
+  breaklines=true,
+  breakatwhitespace=true,
+  showstringspaces=false,
+  tabsize=2,
+  captionpos=b,
+  columns=fullflexible,
+  keepspaces=true,
+  literate=%
+    {é}{{\'e}}1 {è}{{\`e}}1 {ê}{{\^e}}1 {ë}{{\"e}}1
+    {à}{{\`a}}1 {â}{{\^a}}1 {ä}{{\"a}}1
+    {î}{{\^i}}1 {ï}{{\"i}}1
+    {ô}{{\^o}}1 {ö}{{\"o}}1
+    {ù}{{\`u}}1 {û}{{\^u}}1 {ü}{{\"u}}1
+    {ç}{{\c c}}1 {œ}{{\oe}}1 {Œ}{{\OE}}1
+    {É}{{\'E}}1 {È}{{\`E}}1 {Ê}{{\^E}}1 {À}{{\`A}}1 {Ç}{{\c C}}1
+    {×}{{$\times$}}1 {≥}{{$\geq$}}1 {≤}{{$\leq$}}1
+    {→}{{$\rightarrow$}}1 {∧}{{$\wedge$}}1 {σ}{{$\sigma$}}1
+    {’}{{'}}1 {‘}{{'}}1 {“}{{"}}1 {”}{{"}}1
+    {–}{{--}}1 {—}{{---}}1 {…}{{\ldots}}1
+}
+
+\lstdefinestyle{sql}{
+  style=base,
+  language=SQL,
+  morekeywords={REPLACE,PROCEDURE,TRIGGER,PRAGMA,ROWNUM,EXECUTE,
+    IMMEDIATE,EXCEPTION,RAISE,NVL,ROUND,COMMIT,ROLLBACK,EACH,BEFORE,
+    AFTER,LINK,SYNONYM,SEQUENCE,PLUGGABLE,DATABASE,CONTAINER,SESSION,
+    USING,IDENTIFIED,CONNECT,EXPLAIN,PLAN,TRUNCATE,BOOLEAN,IS,LOOP},
+}
+
+\lstdefinestyle{ts}{
+  style=base,
+  morekeywords={const,let,var,async,await,export,import,from,type,
+    interface,return,try,catch,finally,new,function,as,of,Promise,
+    void,if,else,for,while,extends,implements,public,private,readonly},
+  sensitive=true,
+  morecomment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]',
+  morestring=[b]",
+  morestring=[b]`,
+}
+
+\lstdefinestyle{yaml}{
+  style=base,
+  morecomment=[l]{\#},
+  morestring=[b]",
+  morestring=[b]',
+}
+
+% --- En-têtes et pieds de page ---------------------------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\itshape Bases de données réparties : EShop}
+\fancyhead[R]{\small\thepage}
+\fancyfoot[C]{\small Rapport technique}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.0pt}
+
+% --- Liens hypertexte (chargé en dernier) ----------------------------------
+\usepackage[colorlinks=true,linkcolor=accent,urlcolor=accent,
+  citecolor=accent,linktoc=all]{hyperref}
+
+% ============================================================================
+\begin{document}
+
+% --------------------------- PAGE DE GARDE ----------------------------------
+\begin{titlepage}
+\centering
+\vspace*{1.5cm}
+
+{\Large\scshape Rapport technique}\\[0.4cm]
+{\large Module : Bases de données réparties}\\[2.0cm]
+
+\rule{\linewidth}{0.6pt}\\[0.5cm]
+{\huge\bfseries Conception et mise en œuvre\\[0.3cm]
+d'un système de bases de données réparties}\\[0.4cm]
+{\Large Fragmentation horizontale, synchronisation\\ et optimisation sous Oracle~23}\\[0.5cm]
+\rule{\linewidth}{0.6pt}\\[2.0cm]
+
+{\large\textbf{Application : plateforme de commerce « EShop »}}\\[2.5cm]
+
+\begin{tabular}{rl}
+\textbf{Auteur} & Ilyass Bougati \\[0.3cm]
+\textbf{Technologies} & Oracle Database 23 Free, Docker Compose, \\
+                      & PL/SQL, Next.js, node-oracledb \\[0.3cm]
+\textbf{Date} & \today \\
+\end{tabular}
+
+\vfill
+{\small Document généré automatiquement à partir du code source du projet.}
+\end{titlepage}
+
+% --------------------------- TABLE DES MATIÈRES -----------------------------
+\tableofcontents
+\newpage
+
+% ============================================================================
+\section{Introduction et objectifs}
+% ============================================================================
+
+Ce rapport présente la conception et la réalisation d'un \textbf{système de
+gestion de bases de données réparties} appliqué à une plateforme de commerce
+électronique fictive nommée \emph{EShop}. Le projet illustre les concepts
+fondamentaux des bases de données distribuées : la \emph{fragmentation
+horizontale} des données sur plusieurs sites, la \emph{transparence de
+localisation} pour l'application cliente, la \emph{synchronisation}
+automatique entre un nœud central et des nœuds satellites, et enfin
+l'\emph{optimisation} des requêtes locales et distribuées.
+
+\subsection{Contexte fonctionnel}
+
+Le schéma applicatif modélise une boutique en ligne classique : des clients
+passent des commandes, chaque commande étant détaillée en lignes de commande
+qui référencent des produits, eux-mêmes classés par catégorie et rattachés à
+des fournisseurs. La table volumineuse et au cœur de l'activité est
+\texttt{LIGNECOMMANDES} : c'est précisément cette table que l'on cherche à
+\emph{fragmenter} et à \emph{répartir} sur plusieurs serveurs.
+
+\subsection{Objectifs techniques}
+
+Le cahier des charges se décline en six questions (Q1 à Q6), toutes couvertes
+par l'implémentation :
+
+\begin{description}[leftmargin=2.2cm,style=nextline]
+  \item[\textbf{Q1}] Définir le schéma global et fragmenter horizontalement la
+    table \texttt{LIGNECOMMANDES} selon des prédicats métier.
+  \item[\textbf{Q2}] Doter chaque site de procédures stockées d'insertion, de
+    suppression et de mise à jour sur son fragment local.
+  \item[\textbf{Q3}] Garantir l'intégrité référentielle de chaque fragment
+    (clés primaires, clés étrangères, rapatriement des lignes parentes).
+  \item[\textbf{Q4}] Synchroniser automatiquement les sites depuis le nœud
+    global au moyen de déclencheurs (\emph{triggers}).
+  \item[\textbf{Q5}] Analyser et optimiser une requête analytique au moyen de
+    plans d'exécution (\texttt{EXPLAIN PLAN}) et d'index.
+  \item[\textbf{Q6}] Reconstruire une vue globale (chiffre d'affaires par
+    catégorie) à partir des fragments distants via des liens de base de
+    données.
+\end{description}
+
+\subsection{Pile technologique}
+
+L'ensemble repose sur \textbf{Oracle Database 23 Free} (image
+\texttt{gvenzl/oracle-free}), chaque nœud étant un conteneur \textbf{Docker}
+orchestré par \textbf{Docker Compose}. La logique métier est écrite en
+\textbf{PL/SQL}. Un \textbf{tableau de bord web} (Next.js + \texttt{node-oracledb})
+complète le dispositif pour visualiser en temps réel l'état des nœuds et le
+routage des données.
+
+% ============================================================================
+\section{Architecture générale}
+% ============================================================================
+
+\subsection{Vue d'ensemble}
+
+L'architecture suit un modèle \textbf{hub-and-spoke} (étoile) : un nœud
+\emph{global} central détient le jeu de données complet et joue le rôle
+d'unique point d'écriture ; autour de lui gravitent des nœuds \emph{site} qui
+n'hébergent qu'un fragment des données, ainsi qu'un nœud de \emph{sauvegarde}.
+Tous les conteneurs communiquent sur un réseau Docker privé,
+\texttt{maroc-db-net}, et se résolvent mutuellement par des liens de base de
+données Oracle (\emph{database links}).
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+    font=\small,
+    box/.style={draw,thick,rounded corners,align=center,
+                minimum width=3.1cm,minimum height=1.25cm},
+    glob/.style={box,fill=glob},
+    site/.style={box,fill=site},
+    bkp/.style={box,fill=bkp},
+    dash/.style={box,fill=dash,minimum width=4cm},
+    lk/.style={-{Latex[length=2.2mm]},thick},
+    lkd/.style={-{Latex[length=2.2mm]},thick,dashed},
+]
+% Réseau Docker (rectangle de fond, dessiné avant les noeuds)
+\draw[dashed,rounded corners,draw=accent!60]
+      (-6.9,-3.7) rectangle (6.9,3.6);
+\node[accent,anchor=north west] at (-6.8,3.5) {\footnotesize\bfseries maroc-db-net};
+
+% Noeuds base de données
+\node[glob] (g)  at (0,1.7)   {\textbf{oracle-global}\\[1pt]\scriptsize G\_PDB, port 1521\\[1pt]\scriptsize jeu complet + triggers};
+\node[site] (s1) at (-4.4,-1.4){\textbf{oracle-site-1}\\[1pt]\scriptsize S1\_PDB, port 1522\\[1pt]\scriptsize fragment R1};
+\node[site] (s2) at (4.4,-1.4) {\textbf{oracle-site-2}\\[1pt]\scriptsize S2\_PDB, port 1523\\[1pt]\scriptsize fragment R2};
+\node[bkp]  (b)  at (0,-2.6)   {\textbf{oracle-backup}\\[1pt]\scriptsize B\_PDB, port 1524\\[1pt]\scriptsize copie + job horaire};
+
+% Application
+\node[dash] (app) at (0,5.0) {\textbf{Tableau de bord (Next.js)}\\[1pt]\scriptsize node-oracledb (pool de connexions)};
+
+% Triggers : global -> sites
+\draw[lk] (g.west)  to[bend right=18] node[above,sloped,font=\scriptsize]{triggers} (s1.north);
+\draw[lk] (g.east)  to[bend left=18]  node[above,sloped,font=\scriptsize]{triggers} (s2.north);
+% DB links : sites -> global (synonymes)
+\draw[lk] (s1.east) to[bend left=10]  node[below,font=\scriptsize]{DB link} (b.west);
+\draw[lk] (s2.west) to[bend right=10] node[below,font=\scriptsize]{DB link} (b.east);
+% Backup -> global (rechargement horaire)
+\draw[lk] (b.north) -- node[right,font=\scriptsize]{pull horaire} (g.south);
+
+% Application -> noeuds
+\draw[lk]  (app.south) -- node[right,font=\scriptsize]{écritures} (g.north);
+\draw[lkd] (app.west)  to[bend right=30] node[left,font=\scriptsize]{lectures} (s1.west);
+\draw[lkd] (app.east)  to[bend left=30]  node[right,font=\scriptsize]{lectures} (s2.east);
+\end{tikzpicture}
+\caption{Architecture répartie en étoile sur le réseau Docker privé. Les
+écritures arrivent toujours sur le nœud global ; les déclencheurs propagent
+chaque ligne vers le site propriétaire ; le nœud de sauvegarde recharge
+périodiquement l'intégralité du jeu de données.}
+\label{fig:archi}
+\end{figure}
+
+\subsection{Les nœuds du système}
+
+Chaque nœud est une base de données enfichable (\emph{Pluggable Database}, PDB)
+hébergée dans son propre conteneur. Le tableau~\ref{tab:noeuds} récapitule la
+topologie pour le scénario~1.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Nœud} & \textbf{Conteneur} & \textbf{Port hôte} & \textbf{Rôle} \\
+\midrule
+Global    & \texttt{oracle-global} & 1521 & Jeu de données complet, déclencheurs de synchro \\
+Site 1    & \texttt{oracle-site-1} & 1522 & Fragment R1 \\
+Site 2    & \texttt{oracle-site-2} & 1523 & Fragment R2 \\
+Sauvegarde& \texttt{oracle-backup} & 1524 & Copie complète, rechargement horaire \\
+\bottomrule
+\end{tabular}
+\caption{Topologie des nœuds (scénario~1). Le scénario~2 est déployé sur une
+pile parallèle aux ports 1531--1533.}
+\label{tab:noeuds}
+\end{table}
+
+\subsection{Création des bases enfichables (PDB)}
+\label{sec:pdb}
+
+L'image \texttt{gvenzl/oracle-free:23} fournit une base \emph{multilocataire}
+(\emph{multitenant}) : un conteneur racine \texttt{CDB\$ROOT} pouvant héberger
+plusieurs bases enfichables (\emph{Pluggable Databases}). Plutôt que d'utiliser
+la PDB livrée par défaut, \textbf{chaque nœud crée la sienne} au premier
+démarrage (\texttt{G\_PDB}, \texttt{S1\_PDB}, \texttt{S2\_PDB},
+\texttt{B\_PDB}). Cela donne à chaque base un nom de service explicite (ce qui
+rend les alias TNS et les liens lisibles) et isole complètement les jeux de
+données les uns des autres.
+
+La procédure est identique sur les quatre nœuds (seul le nom change). On se
+place dans le conteneur racine, on \emph{clone} la PDB modèle \texttt{pdbseed}
+en recopiant ses fichiers via \texttt{FILE\_NAME\_CONVERT}, on déclare un
+administrateur local \texttt{pdb\_admin}, puis on ouvre la PDB et on
+\textbf{sauvegarde son état} afin qu'elle se rouvre automatiquement à chaque
+redémarrage du conteneur.
+
+\begin{lstlisting}[style=sql,caption={Création d'une base enfichable depuis \texttt{CDB\$ROOT} (extrait de \texttt{01\_create\_schema.sql}, nœud global).},label={lst:pdb}]
+-- 1) Se placer dans le conteneur racine de la base multilocataire
+ALTER SESSION SET CONTAINER = CDB$ROOT;
+
+-- 2) Cloner la PDB modele (pdbseed) en une nouvelle base enfichable
+CREATE PLUGGABLE DATABASE G_PDB
+  ADMIN USER pdb_admin IDENTIFIED BY Admin123
+  ROLES = (DBA)
+  DEFAULT TABLESPACE USERS
+    DATAFILE '/opt/oracle/oradata/FREE/G_PDB/users01.dbf'
+    SIZE 250M AUTOEXTEND ON
+  FILE_NAME_CONVERT = (
+    '/opt/oracle/oradata/FREE/pdbseed/',   -- source : la PDB modele
+    '/opt/oracle/oradata/FREE/G_PDB/'      -- cible  : les fichiers de G_PDB
+  );
+
+-- 3) Ouvrir la PDB et l'enregistrer aupres de l'auditeur (listener)
+ALTER PLUGGABLE DATABASE G_PDB OPEN;
+ALTER SYSTEM REGISTER;
+
+-- 4) Conserver l'etat OPEN au redemarrage du conteneur
+ALTER PLUGGABLE DATABASE G_PDB SAVE STATE;
+
+-- 5) Basculer dans la nouvelle PDB pour y creer le schema
+ALTER SESSION SET CONTAINER = G_PDB;
+\end{lstlisting}
+
+Deux instructions méritent attention. \texttt{ALTER SYSTEM REGISTER} force
+l'enregistrement immédiat du service auprès de l'\emph{auditeur}, sans quoi un
+lien de base de données entrant pourrait ne pas résoudre le service pendant la
+première minute. \texttt{SAVE STATE} évite d'avoir à rouvrir manuellement la PDB
+(elle est \texttt{MOUNTED} mais fermée par défaut après un redémarrage).
+
+\subsection{Orchestration par Docker Compose}
+
+Le fichier \texttt{compose.yaml} décrit les conteneurs, leurs volumes
+persistants, leurs limites de ressources, et surtout l'\textbf{ordre de
+démarrage}. Les scripts SQL placés dans \texttt{scripts-*/} sont montés dans
+\texttt{/container-entrypoint-initdb.d/} et exécutés automatiquement au premier
+démarrage de chaque conteneur.
+
+Le point délicat est la \textbf{dépendance de démarrage} : les sites ne doivent
+s'initialiser qu'une fois le nœud global prêt, car leurs scripts rapatrient des
+données depuis celui-ci. Cela est garanti par la combinaison d'un
+\texttt{healthcheck} sur le global et d'une clause
+\texttt{depends\_on:\ condition:\ service\_healthy} sur les sites. Le
+\texttt{healthcheck} interroge une table sentinelle \texttt{INIT\_COMPLETE},
+créée tout à la fin du dernier script du global : tant que la sentinelle est
+absente, le global est considéré comme « non sain » et les sites attendent.
+
+\begin{lstlisting}[style=yaml,caption={Service du nœud global : healthcheck par sentinelle (extrait de \texttt{compose.yaml}).},label={lst:compose}]
+db-global:
+  image: gvenzl/oracle-free:23-slim-faststart
+  container_name: oracle-global
+  ports:
+    - "1521:1521"
+  volumes:
+    - global-data:/opt/oracle/oradata
+    - ./scripts-global:/container-entrypoint-initdb.d/
+    - ./tnsnames.ora:/opt/oracle/network/admin/tnsnames.ora
+  healthcheck:
+    test:
+      [ "CMD-SHELL",
+        "echo 'SELECT sentinel FROM pdb_admin.INIT_COMPLETE WHERE ROWNUM=1;' \
+         | sqlplus -s s1_user/mon_mdp@//localhost:1521/G_PDB \
+         | grep -q READY || exit 1" ]
+    interval: 30s
+    timeout: 10s
+    retries: 20
+    start_period: 120s
+  networks:
+    - maroc-db-net
+
+db-site-1:
+  # ...
+  depends_on:
+    db-global:
+      condition: service_healthy   # le site attend que le global soit prêt
+\end{lstlisting}
+
+\subsection{Résolution de noms et liens de base de données}
+
+Un fichier \texttt{tnsnames.ora} unique est partagé entre tous les conteneurs.
+Il définit des alias réseau (\texttt{GLOBAL\_DB\_ALIAS}, \texttt{S1\_ALIAS},
+\texttt{S2\_ALIAS}, \texttt{BACKUP\_ALIAS}) qui pointent vers les noms d'hôtes
+Docker. Ces alias sont ensuite utilisés pour créer les \emph{database links},
+qui sont le mécanisme par lequel un nœud Oracle accède aux objets d'un autre
+nœud, comme s'ils étaient locaux.
+
+\begin{lstlisting}[style=sql,caption={Alias TNS et création d'un lien de base de données.},label={lst:tns}]
+-- tnsnames.ora : alias resolu via le DNS interne de Docker
+GLOBAL_DB_ALIAS =
+  (DESCRIPTION =
+    (ADDRESS = (PROTOCOL = TCP)(HOST = db-global)(PORT = 1521))
+    (CONNECT_DATA = (SERVER = DEDICATED)(SERVICE_NAME = G_PDB)))
+
+-- Depuis un site, on cree un lien vers le global ...
+CREATE DATABASE LINK link_to_global
+    CONNECT TO s1_user IDENTIFIED BY mon_mdp
+    USING 'GLOBAL_DB_ALIAS';
+
+-- ... et l'on masque la localisation derriere des synonymes :
+-- une requete sur PRODUITS interroge en realite le noeud global.
+CREATE OR REPLACE SYNONYM PRODUITS FOR pdb_admin.PRODUITS@link_to_global;
+\end{lstlisting}
+
+L'usage de \textbf{synonymes} par-dessus les liens réalise la
+\emph{transparence de localisation} : le code des procédures d'un site écrit
+\texttt{SELECT \ldots\ FROM PRODUITS} sans savoir que la table physique réside
+sur le nœud global.
+
+\subsection{Utilisateurs, habilitations et communication inter-nœuds}
+\label{sec:users}
+
+\subsubsection*{Les comptes de chaque nœud}
+
+Chaque PDB possède un propriétaire de schéma, \texttt{pdb\_admin}, créé comme
+\texttt{ADMIN USER} à la naissance de la base (section~\ref{sec:pdb}). C'est le
+seul compte puissant, et il n'est utilisé qu'au moment de l'initialisation par
+les scripts montés dans le conteneur ; le système \emph{en fonctionnement} ne
+s'en sert jamais à travers le réseau. Toute la communication inter-nœuds passe
+par des \textbf{comptes de service dédiés}, au plus faible privilège possible
+(tableau~\ref{tab:users}).
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Compte} & \textbf{Réside sur} & \textbf{Utilisé par} & \textbf{Privilèges accordés} \\
+\midrule
+\texttt{pdb\_admin} & toutes les PDB & scripts d'init & propriétaire du schéma (DBA local) \\
+\texttt{s1\_user}   & \texttt{G\_PDB} & lien du Site 1 & \texttt{SELECT} (7 tables), \texttt{CREATE SESSION}, \\
+                    &                 &                & \texttt{EXECUTE insert\_ligne\_commande} \\
+\texttt{s2\_user}   & \texttt{G\_PDB} & lien du Site 2 & \texttt{SELECT} (7 tables), \texttt{CREATE SESSION} \\
+\texttt{b\_user}    & \texttt{G\_PDB} & lien du Backup & \texttt{SELECT} (7 tables), \texttt{CREATE SESSION} \\
+\texttt{g\_user}    & \texttt{S1\_PDB}, \texttt{S2\_PDB} & liens du global & \texttt{EXECUTE} (3 procédures), \texttt{SELECT} \\
+                    &                 &                & (tables de fragment), \texttt{CREATE SESSION} \\
+\bottomrule
+\end{tabular}
+\caption{Comptes fonctionnels et leurs privilèges. Aucun ne dispose des droits
+\texttt{DBA}, \texttt{CREATE TABLE} ou d'écriture directe.}
+\label{tab:users}
+\end{table}
+
+\subsubsection*{Le principe du moindre privilège}
+
+Chaque compte de service ne reçoit que les droits strictement nécessaires à sa
+mission, et rien de plus. Les comptes qui ne font que \emph{lire} le nœud
+global (\texttt{s1\_user}, \texttt{s2\_user}, \texttt{b\_user}) n'obtiennent que
+\texttt{SELECT} sur les tables et \texttt{CREATE SESSION} pour ouvrir une
+connexion : ils ne peuvent ni modifier les données, ni créer d'objet, ni voir
+les autres schémas. À l'inverse, le compte \texttt{g\_user}, par lequel le
+global \emph{écrit} sur les sites, ne reçoit pas l'accès direct aux tables : il
+n'a que le droit d'\texttt{EXECUTE} sur les trois procédures de routage, qui
+encapsulent et contrôlent toutes les écritures.
+
+\begin{lstlisting}[style=sql,caption={Habilitations au plus juste : aucun \texttt{GRANT ALL} (extraits de \texttt{04\_create\_roles.sql} et des scripts de site).},label={lst:grants}]
+-- Sur le noeud GLOBAL : un compte de lien ne recoit que la LECTURE
+GRANT SELECT ON pdb_admin.CLIENTS        TO s1_user;
+GRANT SELECT ON pdb_admin.PRODUITS       TO s1_user;
+GRANT SELECT ON pdb_admin.LIGNECOMMANDES TO s1_user;   -- ... idem pour les 7 tables
+GRANT CREATE SESSION                     TO s1_user;
+GRANT EXECUTE ON pdb_admin.insert_ligne_commande TO s1_user;
+
+-- Sur chaque SITE : g_user n'execute QUE les procedures de routage
+GRANT CREATE SESSION                     TO g_user;
+GRANT EXECUTE ON pdb_admin.insertligne   TO g_user;
+GRANT EXECUTE ON pdb_admin.deleteligne   TO g_user;
+GRANT EXECUTE ON pdb_admin.updateligne   TO g_user;
+GRANT SELECT  ON pdb_admin.LIGNECOMMANDES1 TO g_user;  -- lecture des fragments
+\end{lstlisting}
+
+Une factorisation de ces autorisations dans un rôle \texttt{site\_role} a été
+préparée (et laissée en commentaire dans \texttt{04\_create\_roles.sql}) ; la
+version déployée conserve des \texttt{GRANT} explicites par compte, plus
+lisibles à des fins pédagogiques et auditables d'un coup d'œil.
+
+\subsubsection*{Qui se connecte à qui}
+
+La communication repose entièrement sur des \emph{database links}, chacun
+ouvrant une session sur la base distante \textbf{au nom d'un compte de service
+précis}. Le sens des flux est dissymétrique : les sites \emph{tirent} les
+données de référence depuis le global, tandis que le global \emph{pousse} les
+écritures vers les sites via les déclencheurs (section~\ref{sec:triggers}).
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lllll@{}}
+\toprule
+\textbf{Lien} & \textbf{Créé sur} & \textbf{Cible} & \textbf{Connexion en} & \textbf{Usage} \\
+\midrule
+\texttt{link\_to\_global} & Site 1 & \texttt{G\_PDB}  & \texttt{s1\_user} & lecture des parents (synonymes) \\
+\texttt{link\_to\_global} & Site 2 & \texttt{G\_PDB}  & \texttt{s2\_user} & lecture des parents (synonymes) \\
+\texttt{link\_to\_global} & Backup & \texttt{G\_PDB}  & \texttt{b\_user}  & rechargement horaire \\
+\texttt{link\_to\_site1}  & Global & \texttt{S1\_PDB} & \texttt{g\_user}  & propagation des écritures \\
+\texttt{link\_to\_site2}  & Global & \texttt{S2\_PDB} & \texttt{g\_user}  & propagation des écritures \\
+\bottomrule
+\end{tabular}
+\caption{Les cinq liens de base de données et le compte de service utilisé par
+chacun.}
+\label{tab:links}
+\end{table}
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+    font=\small,
+    box/.style={draw,thick,rounded corners,align=left,
+                minimum width=4.0cm,minimum height=1.45cm,inner sep=6pt},
+    glob/.style={box,fill=glob},
+    site/.style={box,fill=site},
+    bkp/.style={box,fill=bkp},
+    push/.style={-{Latex[length=2.4mm]},thick},
+    pull/.style={-{Latex[length=2.4mm]},thick,dashed},
+]
+% --- Noeuds ---
+\node[glob] (g)  at (0,4.4)   {\textbf{oracle-global} (\texttt{G\_PDB})\\[2pt]
+    \scriptsize\texttt{pdb\_admin} (propriétaire)\\
+    \scriptsize\texttt{s1\_user}, \texttt{s2\_user}, \texttt{b\_user} (SELECT)};
+\node[site] (s1) at (-5.4,1.4){\textbf{oracle-site-1} (\texttt{S1\_PDB})\\[2pt]
+    \scriptsize\texttt{pdb\_admin} (propriétaire)\\
+    \scriptsize\texttt{g\_user} (EXECUTE)};
+\node[site] (s2) at (5.4,1.4) {\textbf{oracle-site-2} (\texttt{S2\_PDB})\\[2pt]
+    \scriptsize\texttt{pdb\_admin} (propriétaire)\\
+    \scriptsize\texttt{g\_user} (EXECUTE)};
+\node[bkp]  (b)  at (0,-1.2)  {\textbf{oracle-backup} (\texttt{B\_PDB})\\[2pt]
+    \scriptsize\texttt{pdb\_admin} (propriétaire)};
+
+% --- Liens : deux arcs opposes par paire (pas d'etiquette sur les fleches) ---
+% Trait plein  = ecritures poussees par le global (compte g_user)
+% Pointilles   = lectures tirees du global (comptes s1_user / s2_user / b_user)
+\draw[push] (g)  to[bend left=15] (s1);
+\draw[pull] (s1) to[bend left=15] (g);
+\draw[push] (g)  to[bend left=15] (s2);
+\draw[pull] (s2) to[bend left=15] (g);
+\draw[pull] (b) -- (g);
+
+% --- Legende ---
+\node[draw,rounded corners,fill=white,inner sep=6pt,align=left,font=\scriptsize,
+      anchor=north] at (0,-2.3) {%
+  \tikz{\draw[-{Latex[length=1.8mm]},thick] (0,0)--(0.7,0);}~~écritures poussées par le global (compte \texttt{g\_user})\\[3pt]
+  \tikz{\draw[-{Latex[length=1.8mm]},thick,dashed] (0,0)--(0.7,0);}~~lectures tirées du global (comptes \texttt{s1\_user}, \texttt{s2\_user}, \texttt{b\_user})%
+};
+\end{tikzpicture}
+\caption{Communication inter-nœuds. Les flèches pleines représentent les
+écritures poussées par le nœud global vers les sites (via le compte
+\texttt{g\_user}) ; les flèches pointillées, les lectures que les autres nœuds
+tirent du global. Le détail de chaque lien et du compte qu'il emploie figure au
+tableau~\ref{tab:links}.}
+\label{fig:users}
+\end{figure}
+
+\subsection{Les deux scénarios de fragmentation}
+
+Le projet implémente deux stratégies de fragmentation, déployées sur deux piles
+indépendantes (répertoires \texttt{scenario-1/} et \texttt{scenario-2/}). Le
+tableau~\ref{tab:scenarios} les compare ; la section~\ref{sec:fragmentation}
+les détaille.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+ & \textbf{Scénario 1 (par catégorie)} & \textbf{Scénario 2 (par volume)} \\
+\midrule
+Fragment R1 (Site 1) & \texttt{IDCATEG=50 $\wedge$ QTÉ$>$100} & \texttt{QTÉ $\geq$ 100} \\
+Fragment R2 (Site 2) & \texttt{IDCATEG=35 $\wedge$ QTÉ$>$50}  & \texttt{QTÉ $<$ 100} \\
+Disjoints            & oui & oui \\
+Exhaustifs           & \textbf{non} (reste au global) & \textbf{oui} (partition complète) \\
+Donnée de routage    & catégorie (jointure \texttt{PRODUITS}) & \texttt{QUANTITE} (colonne directe) \\
+\bottomrule
+\end{tabular}
+\caption{Comparaison des deux stratégies de fragmentation horizontale.}
+\label{tab:scenarios}
+\end{table}
+
+% ============================================================================
+\section{Modèle de données}
+% ============================================================================
+
+Le schéma global comprend sept tables. \texttt{CLIENTS}, \texttt{FOURNISSEURS},
+\texttt{EMPLOYES} et \texttt{CATEGORIES} sont des tables de référence ;
+\texttt{COMMANDES}, \texttt{PRODUITS} et \texttt{LIGNECOMMANDES} portent
+l'activité transactionnelle. Les relations clés sont : une \texttt{COMMANDE}
+appartient à un \texttt{CLIENT} et à un \texttt{EMPLOYE} ; un \texttt{PRODUIT}
+relève d'une \texttt{CATEGORIE} et d'un \texttt{FOURNISSEUR} ; une
+\texttt{LIGNECOMMANDE} relie une \texttt{COMMANDE} à un \texttt{PRODUIT} avec
+une quantité et une remise. Le rôle de chacune des sept tables est le suivant :
+
+\begin{itemize}[leftmargin=1.4cm]
+  \item \texttt{CLIENTS} : fiche des clients (société, contact, adresse, pays\ldots).
+  \item \texttt{FOURNISSEURS} : fiche des fournisseurs approvisionnant les produits.
+  \item \texttt{EMPLOYES} : personnel ayant saisi les commandes.
+  \item \texttt{CATEGORIES} : nomenclature des familles de produits ; sa clé
+        \texttt{IDCATEG} sert de critère de routage au scénario~1.
+  \item \texttt{COMMANDES} : en-têtes de commande (client, employé, dates).
+  \item \texttt{PRODUITS} : catalogue, rattaché à une catégorie et un fournisseur.
+  \item \texttt{LIGNECOMMANDES} : lignes de commande (produit, quantité, remise) ;
+        c'est la \textbf{seule table fragmentée} entre les sites.
+\end{itemize}
+
+Les quatre tables de référence portent les clés primaires vers lesquelles
+pointent les clés étrangères des tables transactionnelles :
+
+\begin{lstlisting}[style=sql,caption={Tables de référence du schéma global (extrait de \texttt{02\_create\_table.sql}).},label={lst:schema-ref}]
+CREATE TABLE CLIENTS (
+    IDCLIENT   NUMBER PRIMARY KEY,
+    CODECLIENT VARCHAR2(100),
+    SOCIETE    VARCHAR2(100) NOT NULL,
+    CONTACT    VARCHAR2(100) NOT NULL,
+    FONCTION   VARCHAR2(100) NOT NULL,
+    ADRESSE    VARCHAR2(100),  VILLE  VARCHAR2(100),  REGION VARCHAR2(100),
+    CP         VARCHAR2(10),   PAYS   VARCHAR2(100),
+    NAISSANCE  DATE,
+    TELEPHONE  VARCHAR2(100),  FAX    VARCHAR2(100)
+);
+
+CREATE TABLE FOURNISSEURS (
+    IDFOUR      INTEGER PRIMARY KEY,
+    SOCIETEFOUR VARCHAR2(100 CHAR),
+    CONTACTFOUR VARCHAR2(100 CHAR),
+    -- ... autres colonnes : fonction, adresse, ville, region, CP, telephone, fax
+    PAYSFOUR    VARCHAR2(100 CHAR)
+);
+
+CREATE TABLE EMPLOYES (
+    IDEMPLOYE       INTEGER PRIMARY KEY,
+    NOM             VARCHAR2(100 CHAR),
+    PRENOM          VARCHAR2(100 CHAR),
+    FONCTIONEMPLOYE VARCHAR2(100 CHAR),
+    DATEEMBAUCHE    DATE,
+    -- ... autres colonnes : titre de courtoisie, naissance, adresse, ville, pays, tel
+    VILLEEMPLOYE    VARCHAR2(100 CHAR)
+);
+
+CREATE TABLE CATEGORIES (
+    IDCATEG        INTEGER PRIMARY KEY,
+    NOMDECATEGORIE VARCHAR2(100 CHAR),
+    DESCRIPTION    CLOB
+);
+\end{lstlisting}
+
+Les trois tables transactionnelles, qui matérialisent ces relations par des
+clés étrangères, sont créées ensuite :
+
+\begin{lstlisting}[style=sql,caption={Tables transactionnelles du schéma global (extrait de \texttt{02\_create\_table.sql}).},label={lst:schema}]
+CREATE TABLE COMMANDES (
+    IDCOMMANDE    INTEGER PRIMARY KEY,
+    IDEMPLOYE     INTEGER REFERENCES Employes(IDEMPLOYE),
+    IDCLIENT      INTEGER REFERENCES Clients(IDCLIENT),
+    DATECOMMANDE  DATE,
+    DATELIVRAISON DATE, CHECK (DATELIVRAISON >= DATECOMMANDE),
+    NMESSAGER     NUMBER(4,0),
+    PORTNUMBER    NUMBER(4,0)
+);
+
+CREATE TABLE PRODUITS (
+    IDPRODUIT    INTEGER PRIMARY KEY,
+    DESIGNATION  VARCHAR2(100 CHAR),
+    IDFOUR       INTEGER REFERENCES FOURNISSEURS(IDFOUR),
+    IDCATEG      INTEGER REFERENCES CATEGORIES(IDCATEG),
+    PRIXUNITAIRE FLOAT,
+    INDISPONIBLE INTEGER, CHECK (INDISPONIBLE IN (0,1))
+);
+
+CREATE TABLE LigneCommandes (
+    IDLIGNECOMMANDE INTEGER PRIMARY KEY,
+    IDCOMMANDE      INTEGER REFERENCES COMMANDES(IDCOMMANDE),
+    IDPRODUIT       INTEGER REFERENCES PRODUITS(IDPRODUIT),
+    QUANTITE        INTEGER,
+    REMISE          FLOAT
+);
+\end{lstlisting}
+
+On notera que la \textbf{catégorie d'un produit n'est pas stockée} sur la ligne
+de commande : elle n'est accessible que par jointure avec \texttt{PRODUITS}.
+Cette particularité a une conséquence directe sur le scénario~1, où le routage
+dépend de la catégorie (voir section~\ref{sec:triggers}).
+
+% ============================================================================
+\section{Fragmentation horizontale}
+\label{sec:fragmentation}
+% ============================================================================
+
+\subsection{Principe}
+
+La \emph{fragmentation horizontale} consiste à partitionner une table en
+sous-ensembles de \emph{lignes} (et non de colonnes) au moyen d'un prédicat de
+sélection. En algèbre relationnelle, chaque fragment $R_i$ est défini par une
+sélection $\sigma_{P_i}(R)$. Deux propriétés sont recherchées :
+
+\begin{itemize}[leftmargin=1.4cm]
+  \item \textbf{Disjonction} : $\sigma_{P_i}(R) \cap \sigma_{P_j}(R) =
+    \varnothing$ pour $i \neq j$, aucune ligne n'est dupliquée entre deux
+    sites.
+  \item \textbf{Complétude (ou exhaustivité)} : $\bigcup_i \sigma_{P_i}(R) = R$,
+    aucune ligne n'est perdue.
+\end{itemize}
+
+\subsection{Scénario 1 : fragmentation par catégorie}
+
+\begin{align*}
+R_1 &= \sigma_{\,\text{IDCATEG}=50 \,\wedge\, \text{QUANTITE}>100}(\text{LigneCommandes}), \\
+R_2 &= \sigma_{\,\text{IDCATEG}=35 \,\wedge\, \text{QUANTITE}>50}(\text{LigneCommandes}).
+\end{align*}
+
+Ces deux fragments sont \textbf{disjoints} (les catégories 50 et 35 sont
+exclusives) mais \textbf{non exhaustifs} : toutes les lignes dont la catégorie
+n'est ni 50 ni 35, ou dont la quantité est trop faible, n'appartiennent à aucun
+site et ne subsistent que sur le nœud global.
+
+\subsection{Scénario 2 : fragmentation par volume}
+
+\begin{align*}
+R_1 &= \sigma_{\,\text{QUANTITE} \geq 100}(\text{LigneCommandes}), \\
+R_2 &= \sigma_{\,\text{QUANTITE} < 100}(\text{LigneCommandes}).
+\end{align*}
+
+Cette partition est à la fois disjointe \emph{et} exhaustive : toute ligne
+appartient à exactement un site. Le routage ne nécessite alors aucune jointure,
+puisque \texttt{QUANTITE} est une colonne directe de la table.
+
+\subsection{Construction des fragments et intégrité référentielle}
+
+Chaque site construit ses tables de fragment par \texttt{CREATE TABLE AS
+SELECT} en filtrant les données rapatriées du global via les synonymes. Comme
+cette syntaxe \textbf{n'hérite pas des contraintes} (clés primaires, clés
+étrangères), celles-ci sont \textbf{reconstruites explicitement}. De plus, pour
+préserver l'intégrité référentielle, le site n'importe pas seulement les lignes
+de commande : il importe aussi les \texttt{PRODUITS}, \texttt{COMMANDES} et
+\texttt{CLIENTS} \emph{associés} (réponse à Q3).
+
+\begin{lstlisting}[style=sql,caption={Construction du fragment R1 sur le site~1 (extrait de \texttt{03\_create\_tables.sql}).},label={lst:fragment}]
+-- Sous-ensemble des lignes de commande satisfaisant R1
+CREATE TABLE LIGNECOMMANDES1 AS
+    SELECT lc.*
+    FROM   LIGNECOMMANDES lc
+    JOIN   PRODUITS p ON lc.IDPRODUIT = p.IDPRODUIT
+    WHERE  lc.QUANTITE > 100
+    AND    p.IDCATEG   = 50;
+
+-- La cle primaire n'est PAS heritee du CREATE TABLE AS SELECT
+ALTER TABLE LIGNECOMMANDES1
+    ADD CONSTRAINT lignecommandes1_pk PRIMARY KEY (IDLIGNECOMMANDE);
+
+-- On ne rapatrie que les produits/commandes/clients effectivement references
+CREATE TABLE PRODUITS1 AS
+    SELECT DISTINCT p.*
+    FROM   PRODUITS p
+    JOIN   LIGNECOMMANDES1 lc ON p.IDPRODUIT = lc.IDPRODUIT;
+
+-- ... puis on retablit les cles etrangeres entre fragments locaux
+ALTER TABLE LIGNECOMMANDES1
+    ADD CONSTRAINT lignecommandes1_produits1_fk
+    FOREIGN KEY (IDPRODUIT) REFERENCES PRODUITS1(IDPRODUIT);
+\end{lstlisting}
+
+% ============================================================================
+\section{Procédures stockées de chaque site (Q2 et Q3)}
+% ============================================================================
+
+Chaque site expose trois procédures PL/SQL (\texttt{insertligne},
+\texttt{deleteligne} et \texttt{updateligne}) qui encapsulent toute la
+logique de manipulation de son fragment. Elles sont appelées à distance par les
+déclencheurs du nœud global (section~\ref{sec:triggers}).
+
+\subsection{Insertion avec rapatriement des parents}
+
+La procédure \texttt{insertligne} ne se contente pas d'insérer la ligne : elle
+\textbf{garantit au préalable la présence des lignes parentes}. Si le produit,
+la commande ou le client correspondant est absent du fragment, il est importé à
+la volée depuis le global. C'est cette discipline qui maintient l'intégrité
+référentielle malgré la fragmentation.
+
+\begin{lstlisting}[style=sql,caption={Insertion avec rapatriement automatique des parents (extrait, site~1).},label={lst:insert}]
+CREATE OR REPLACE PROCEDURE insertligne (
+    p_idlignecommande IN LIGNECOMMANDES1.IDLIGNECOMMANDE%TYPE,
+    p_idcommande      IN LIGNECOMMANDES1.IDCOMMANDE%TYPE,
+    p_idproduit       IN LIGNECOMMANDES1.IDPRODUIT%TYPE,
+    p_quantite        IN LIGNECOMMANDES1.QUANTITE%TYPE,
+    p_remise          IN LIGNECOMMANDES1.REMISE%TYPE
+) IS
+    v_count    INTEGER;
+    v_idclient COMMANDES1.IDCLIENT%TYPE;
+BEGIN
+    -- Le produit existe-t-il deja localement ? Sinon, on l'importe du global.
+    SELECT COUNT(*) INTO v_count FROM PRODUITS1 WHERE IDPRODUIT = p_idproduit;
+    IF v_count = 0 THEN
+        INSERT INTO PRODUITS1 SELECT * FROM PRODUITS WHERE IDPRODUIT = p_idproduit;
+    END IF;
+
+    -- Idem pour la commande (et le client qu'elle reference)
+    SELECT COUNT(*) INTO v_count FROM COMMANDES1 WHERE IDCOMMANDE = p_idcommande;
+    IF v_count = 0 THEN
+        SELECT IDCLIENT INTO v_idclient FROM COMMANDES WHERE IDCOMMANDE = p_idcommande;
+        SELECT COUNT(*) INTO v_count FROM CLIENTS1 WHERE IDCLIENT = v_idclient;
+        IF v_count = 0 THEN
+            INSERT INTO CLIENTS1 SELECT * FROM CLIENTS WHERE IDCLIENT = v_idclient;
+        END IF;
+        INSERT INTO COMMANDES1 SELECT * FROM COMMANDES WHERE IDCOMMANDE = p_idcommande;
+    END IF;
+
+    INSERT INTO LIGNECOMMANDES1 (IDLIGNECOMMANDE, IDCOMMANDE, IDPRODUIT, QUANTITE, REMISE)
+    VALUES (p_idlignecommande, p_idcommande, p_idproduit, p_quantite, p_remise);
+    COMMIT;
+EXCEPTION
+    WHEN OTHERS THEN ROLLBACK; RAISE;
+END insertligne;
+/
+\end{lstlisting}
+
+\subsection{Suppression en cascade « ascendante »}
+
+Symétriquement, \texttt{deleteligne} supprime la ligne puis \textbf{nettoie les
+parents devenus orphelins} : si la commande n'a plus aucune ligne, elle est
+supprimée ; si le client n'a plus aucune commande, il l'est à son tour. Les
+produits, en revanche, sont des données de référence partagées et ne sont
+jamais supprimés.
+
+\begin{lstlisting}[style=sql,caption={Suppression et nettoyage des parents orphelins (extrait).},label={lst:delete}]
+DELETE FROM LIGNECOMMANDES1 WHERE IDLIGNECOMMANDE = p_idlignecommande;
+
+-- La commande a-t-elle encore des lignes ?
+SELECT COUNT(*) INTO v_count FROM LIGNECOMMANDES1 WHERE IDCOMMANDE = v_idcommande;
+IF v_count = 0 THEN
+    DELETE FROM COMMANDES1 WHERE IDCOMMANDE = v_idcommande;
+    -- Le client a-t-il encore des commandes ?
+    SELECT COUNT(*) INTO v_count FROM COMMANDES1 WHERE IDCLIENT = v_idclient;
+    IF v_count = 0 THEN
+        DELETE FROM CLIENTS1 WHERE IDCLIENT = v_idclient;
+    END IF;
+END IF;
+\end{lstlisting}
+
+\subsection{Habilitations}
+
+Les procédures sont exécutées au travers du lien de base de données par un
+compte de service dédié, \texttt{g\_user}. Celui-ci reçoit donc les droits
+\texttt{EXECUTE} sur les trois procédures, \texttt{SELECT} sur les tables de
+fragment, ainsi que \texttt{CREATE SESSION}, et rien d'autre. Ce compte est une
+illustration directe du principe du moindre privilège détaillé en
+section~\ref{sec:users}.
+
+% ============================================================================
+\section{Synchronisation par déclencheurs (Q4)}
+\label{sec:triggers}
+% ============================================================================
+
+C'est le cœur du système. Trois déclencheurs (\emph{triggers}) posés sur la
+table \texttt{LIGNECOMMANDES} du nœud global interceptent chaque \texttt{INSERT},
+\texttt{DELETE} et \texttt{UPDATE} et propagent la modification vers le site
+propriétaire, en appelant à distance les procédures de la
+section précédente. L'application n'écrit donc \textbf{que sur le global} : le
+routage est entièrement automatique et transparent.
+
+\subsection{Routage à l'insertion}
+
+Le déclencheur d'insertion résout d'abord la catégorie du produit (absente de
+la ligne, comme noté plus haut), puis dirige la ligne vers Site~1 et/ou Site~2
+selon les prédicats $R_1$ et $R_2$.
+
+\begin{lstlisting}[style=sql,caption={Déclencheur de routage à l'insertion, scénario~1 (extrait de \texttt{06\_create\_triggers.sql}).},label={lst:trig-insert}]
+CREATE OR REPLACE TRIGGER SYC_INSERT_LIGNE
+AFTER INSERT ON pdb_admin.LIGNECOMMANDES
+FOR EACH ROW
+DECLARE
+    PRAGMA AUTONOMOUS_TRANSACTION;          -- (voir explications ci-dessous)
+    v_idcateg PRODUITS.IDCATEG%TYPE;
+BEGIN
+    -- La categorie n'est pas sur la ligne : on la lit dans PRODUITS
+    SELECT IDCATEG INTO v_idcateg FROM PRODUITS WHERE IDPRODUIT = :NEW.IDPRODUIT;
+
+    -- Route vers Site 1 si la ligne satisfait R1
+    IF v_idcateg = 50 AND :NEW.QUANTITE > 100 THEN
+        EXECUTE IMMEDIATE 'BEGIN pdb_admin.insertligne@link_to_site1(:1,:2,:3,:4,:5); END;'
+            USING :NEW.IDLIGNECOMMANDE, :NEW.IDCOMMANDE, :NEW.IDPRODUIT,
+                  :NEW.QUANTITE, :NEW.REMISE;
+    END IF;
+
+    -- Route vers Site 2 si la ligne satisfait R2
+    IF v_idcateg = 35 AND :NEW.QUANTITE > 50 THEN
+        EXECUTE IMMEDIATE 'BEGIN pdb_admin.insertligne@link_to_site2(:1,:2,:3,:4,:5); END;'
+            USING :NEW.IDLIGNECOMMANDE, :NEW.IDCOMMANDE, :NEW.IDPRODUIT,
+                  :NEW.QUANTITE, :NEW.REMISE;
+    END IF;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN NULL;           -- produit absent => aucun fragment
+    WHEN OTHERS THEN
+        RAISE_APPLICATION_ERROR(-20010, 'SYC_INSERT_LIGNE: ' || SQLERRM);
+END SYC_INSERT_LIGNE;
+/
+\end{lstlisting}
+
+\subsection{Deux décisions de conception déterminantes}
+
+Le code ci-dessus comporte deux choix techniques qui méritent d'être justifiés,
+car ils contournent deux erreurs Oracle bien précises.
+
+\paragraph{1. \texttt{EXECUTE IMMEDIATE} plutôt qu'un appel direct.}
+Oracle~23c valide les références aux procédures distantes \emph{à la compilation}
+du déclencheur. Or les conteneurs des sites démarrent \emph{après} le global :
+au moment où le déclencheur est compilé, les procédures distantes n'existent pas
+encore, et un appel direct échouerait avec l'erreur \texttt{PLS-00352}. En
+passant par du SQL dynamique (\texttt{EXECUTE IMMEDIATE}), la résolution est
+\textbf{différée à l'exécution}, ce qui rompt cette dépendance de compilation.
+
+\paragraph{2. \texttt{PRAGMA AUTONOMOUS\_TRANSACTION}.}
+Les procédures distantes effectuent un \texttt{COMMIT}. Sans cette directive, ce
+\texttt{COMMIT} se produirait au sein de la transaction distribuée pilotée par
+le déclencheur, ce qui déclencherait l'erreur \texttt{ORA-02089} (« \texttt{COMMIT}
+interdit dans une session subordonnée »). La directive isole chaque appel de
+site dans sa \textbf{propre transaction autonome}.
+
+\medskip
+\noindent\textbf{Contrepartie assumée.} Cette autonomie transactionnelle a un
+prix : si la transaction globale est ensuite annulée (\texttt{ROLLBACK}), le
+site a déjà validé sa copie de la ligne. Il n'y a donc \textbf{pas d'atomicité
+distribuée}. Ce compromis est acceptable dans un cadre pédagogique ; un système
+de production exigerait une validation en deux phases (2PC/XA) ou une file de
+messages fiable (Oracle Advanced Queuing). Ce point est repris en
+section~\ref{sec:limites}.
+
+\subsection{Le cas subtil de la mise à jour}
+
+Une mise à jour peut faire \emph{entrer} une ligne dans un fragment, l'en faire
+\emph{sortir}, ou l'y \emph{maintenir}. Le déclencheur de mise à jour compare
+donc l'appartenance au fragment \emph{avant} et \emph{après} la modification, et
+choisit l'action adéquate parmi quatre cas, pour chaque site
+(tableau~\ref{tab:update}).
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Avant} & \textbf{Après} & \textbf{Action sur le site} \\
+\midrule
+dans le fragment & dans le fragment & \texttt{updateligne} (mise à jour sur place) \\
+dans le fragment & hors fragment    & \texttt{deleteligne} (la ligne quitte le site) \\
+hors fragment    & dans le fragment & \texttt{insertligne} (la ligne entre sur le site) \\
+hors fragment    & hors fragment    & aucune action \\
+\bottomrule
+\end{tabular}
+\caption{Les quatre cas gérés par \texttt{SYC\_UPDATE\_LIGNE}, par site.}
+\label{tab:update}
+\end{table}
+
+\begin{lstlisting}[style=sql,caption={Logique de transition de fragment à la mise à jour (extrait, partie Site~1).},label={lst:trig-update}]
+v_in_s1_old := (v_old_categ = 50 AND :OLD.QUANTITE > 100);
+v_in_s1_new := (v_new_categ = 50 AND :NEW.QUANTITE > 100);
+
+IF v_in_s1_old AND v_in_s1_new THEN
+    EXECUTE IMMEDIATE 'BEGIN pdb_admin.updateligne@link_to_site1(:1,:2,:3,:4); END;'
+        USING :NEW.IDLIGNECOMMANDE, :NEW.IDPRODUIT, :NEW.QUANTITE, :NEW.REMISE;
+ELSIF v_in_s1_old AND NOT v_in_s1_new THEN
+    EXECUTE IMMEDIATE 'BEGIN pdb_admin.deleteligne@link_to_site1(:1); END;'
+        USING :OLD.IDLIGNECOMMANDE;
+ELSIF NOT v_in_s1_old AND v_in_s1_new THEN
+    EXECUTE IMMEDIATE 'BEGIN pdb_admin.insertligne@link_to_site1(:1,:2,:3,:4,:5); END;'
+        USING :NEW.IDLIGNECOMMANDE, :NEW.IDCOMMANDE, :NEW.IDPRODUIT,
+              :NEW.QUANTITE, :NEW.REMISE;
+END IF;
+\end{lstlisting}
+
+Dans le scénario~2, cette logique se simplifie en une comparaison du seul
+franchissement du seuil \texttt{QUANTITE = 100}, puisque le routage ne dépend
+plus de la catégorie.
+
+% ============================================================================
+\section{Requêtes distribuées et optimisation (Q5 et Q6)}
+% ============================================================================
+
+\subsection{Analyse et optimisation d'une requête locale (Q5)}
+
+La requête analytique étudiée compte le nombre de commandes par client pour
+l'année 2026. Sur un schéma « froid » (sans index), le plan d'exécution révèle
+deux \texttt{TABLE ACCESS FULL} (balayages complets) et une jointure par hachage
+coûteuse. Deux leviers d'optimisation sont appliqués :
+
+\begin{enumerate}[leftmargin=1.4cm]
+  \item \textbf{Réécriture du prédicat de date.} La forme
+    \texttt{EXTRACT(YEAR FROM DATECOMMANDE)=2026} \emph{empêche} l'usage d'un
+    index B-tree (la valeur indexée n'est pas la valeur calculée). On la
+    remplace par un prédicat d'intervalle
+    \texttt{DATECOMMANDE >= DATE '2026-01-01' AND < DATE '2027-01-01'}, qui
+    autorise un \texttt{INDEX RANGE SCAN}.
+  \item \textbf{Création d'index} sur \texttt{COMMANDES(DATECOMMANDE)} et
+    \texttt{COMMANDES(IDCLIENT)}, ce qui permet à l'optimiseur de remplacer le
+    balayage complet par un parcours d'index et la jointure par hachage par une
+    jointure par boucles imbriquées (\texttt{NESTED LOOPS}).
+\end{enumerate}
+
+\begin{lstlisting}[style=sql,caption={Capture d'un plan d'exécution et création d'index (extrait de \texttt{07\_query\_analysis.sql}).},label={lst:explain}]
+-- Plan AVANT optimisation
+EXPLAIN PLAN SET STATEMENT_ID = 'before_index' FOR
+SELECT c.IDCLIENT, c.SOCIETE, COUNT(cmd.IDCOMMANDE) AS NB_COMMANDES
+FROM   CLIENTS c JOIN COMMANDES cmd ON c.IDCLIENT = cmd.IDCLIENT
+WHERE  EXTRACT(YEAR FROM cmd.DATECOMMANDE) = 2026     -- bloque l'index
+GROUP  BY c.IDCLIENT, c.SOCIETE
+ORDER  BY NB_COMMANDES DESC;
+
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY(
+    filter_preds => 'STATEMENT_ID = ''before_index'''));
+
+-- Index correctifs
+CREATE INDEX idx_commandes_date     ON COMMANDES(DATECOMMANDE);
+CREATE INDEX idx_commandes_idclient ON COMMANDES(IDCLIENT);
+
+-- Requete optimisee : predicat d'intervalle => INDEX RANGE SCAN
+EXPLAIN PLAN SET STATEMENT_ID = 'after_index' FOR
+SELECT c.IDCLIENT, c.SOCIETE, COUNT(cmd.IDCOMMANDE) AS NB_COMMANDES
+FROM   CLIENTS c JOIN COMMANDES cmd ON c.IDCLIENT = cmd.IDCLIENT
+WHERE  cmd.DATECOMMANDE >= DATE '2026-01-01'
+AND    cmd.DATECOMMANDE <  DATE '2027-01-01'
+GROUP  BY c.IDCLIENT, c.SOCIETE
+ORDER  BY NB_COMMANDES DESC;
+\end{lstlisting}
+
+\subsection{Reconstruction d'une vue globale (Q6)}
+
+Pour calculer le chiffre d'affaires 2026 par catégorie, on recombine les deux
+fragments distants au travers des liens de base de données. Le revenu d'une
+ligne vaut $\text{QUANTITE} \times \text{PRIXUNITAIRE} \times (1 -
+\text{REMISE})$. On emploie \texttt{UNION ALL} (et non \texttt{UNION}) : les
+fragments étant disjoints par construction, aucune ligne n'apparaît deux fois,
+et \texttt{UNION ALL} évite la passe de déduplication superflue.
+
+\begin{lstlisting}[style=sql,caption={Chiffre d'affaires distribué reconstruit via les liens de base de données (extrait de \texttt{08\_distributed\_query.sql}).},label={lst:distrib}]
+SELECT IDCATEG, ROUND(SUM(CA_LIGNE), 2) AS CHIFFRE_AFFAIRES_2026
+FROM (
+    -- Contribution du Site 1
+    SELECT p.IDCATEG,
+           lc.QUANTITE * p.PRIXUNITAIRE * (1 - NVL(lc.REMISE, 0)) AS CA_LIGNE
+    FROM   pdb_admin.LIGNECOMMANDES1@link_to_site1 lc
+    JOIN   pdb_admin.PRODUITS1@link_to_site1  p ON lc.IDPRODUIT  = p.IDPRODUIT
+    JOIN   pdb_admin.COMMANDES1@link_to_site1 c ON lc.IDCOMMANDE = c.IDCOMMANDE
+    WHERE  c.DATECOMMANDE >= DATE '2026-01-01'
+    AND    c.DATECOMMANDE <  DATE '2027-01-01'
+
+    UNION ALL          -- fragments disjoints : pas de doublon possible
+
+    -- Contribution du Site 2
+    SELECT p.IDCATEG,
+           lc.QUANTITE * p.PRIXUNITAIRE * (1 - NVL(lc.REMISE, 0)) AS CA_LIGNE
+    FROM   pdb_admin.LIGNECOMMANDES2@link_to_site2 lc
+    JOIN   pdb_admin.PRODUITS2@link_to_site2  p ON lc.IDPRODUIT  = p.IDPRODUIT
+    JOIN   pdb_admin.COMMANDES2@link_to_site2 c ON lc.IDCOMMANDE = c.IDCOMMANDE
+    WHERE  c.DATECOMMANDE >= DATE '2026-01-01'
+    AND    c.DATECOMMANDE <  DATE '2027-01-01'
+)
+GROUP BY IDCATEG
+ORDER BY CHIFFRE_AFFAIRES_2026 DESC;
+\end{lstlisting}
+
+% ============================================================================
+\section{Nœud de sauvegarde}
+% ============================================================================
+
+Un quatrième nœud assure une \textbf{copie de secours} du jeu de données global.
+Il héberge un schéma miroir (sans clés étrangères, volontairement) et une
+procédure \texttt{sync\_from\_global} qui effectue un \textbf{rechargement
+complet} : vidage de toutes les tables (\texttt{TRUNCATE}, des feuilles vers la
+racine) puis réinsertion intégrale depuis le global (de la racine vers les
+feuilles, pour respecter l'ordre des dépendances). Cette procédure est
+planifiée toutes les heures par \texttt{DBMS\_SCHEDULER}.
+
+\begin{lstlisting}[style=sql,caption={Procédure de resynchronisation et job horaire (extrait de \texttt{04\_create\_sync\_job.sql}).},label={lst:backup}]
+CREATE OR REPLACE PROCEDURE pdb_admin.sync_from_global AS
+BEGIN
+    -- Vidage des enfants vers les parents
+    EXECUTE IMMEDIATE 'TRUNCATE TABLE pdb_admin.LIGNECOMMANDES';
+    EXECUTE IMMEDIATE 'TRUNCATE TABLE pdb_admin.COMMANDES';
+    -- ... (autres tables)
+
+    -- Rechargement des parents vers les enfants
+    INSERT INTO pdb_admin.CATEGORIES SELECT * FROM pdb_admin.CATEGORIES@link_to_global;
+    -- ...
+    INSERT INTO pdb_admin.LIGNECOMMANDES SELECT * FROM pdb_admin.LIGNECOMMANDES@link_to_global;
+    COMMIT;
+END sync_from_global;
+/
+
+BEGIN
+  DBMS_SCHEDULER.CREATE_JOB(
+    job_name        => 'BACKUP_SYNC_JOB',
+    job_type        => 'STORED_PROCEDURE',
+    job_action      => 'pdb_admin.sync_from_global',
+    start_date      => SYSTIMESTAMP,
+    repeat_interval => 'FREQ=HOURLY;INTERVAL=1',
+    enabled         => TRUE);
+END;
+/
+\end{lstlisting}
+
+% ============================================================================
+\section{Tableau de bord web}
+% ============================================================================
+
+Une application \textbf{Next.js} (App Router, React~19) offre une interface
+d'observation et de test. Côté serveur, des \emph{routes API} se connectent à
+Oracle via le pilote \texttt{node-oracledb}, en gérant un \textbf{pool de
+connexions} par nœud. Le pool est mémorisé dans \texttt{globalThis} pour
+survivre aux rechargements à chaud du serveur de développement.
+
+\begin{lstlisting}[style=ts,caption={Gestion d'un pool de connexions par nœud (extrait de \texttt{lib/oracle.ts}).},label={lst:pool}]
+async function ensurePool(alias: NodeAlias) {
+  if (g._oraPools!.has(alias)) return;
+  try {
+    await oracledb.createPool({
+      poolAlias: alias,
+      ...configs[alias](),
+      poolMin: 0, poolMax: 4, poolIncrement: 1,
+      poolTimeout: 60,
+      connectTimeout: 5, // secondes ; evite les fuites de connexion
+    });
+    g._oraPools!.add(alias);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('NJS-046') || msg.includes('already exists')) {
+      g._oraPools!.add(alias);     // pool deja cree par un hot-reload
+    } else { throw err; }
+  }
+}
+\end{lstlisting}
+
+La route d'insertion illustre bien la \emph{transparence} du dispositif :
+l'application \textbf{insère uniquement sur le global}, attend brièvement la
+propagation par les déclencheurs, puis interroge les deux sites pour
+\emph{constater} où la ligne a été routée et le restituer à l'interface.
+
+\begin{lstlisting}[style=ts,caption={Insertion sur le global puis observation du routage (extrait de \texttt{app/api/insert/route.ts}).},label={lst:insert-api}]
+// 1) Insertion sur le noeud global : les triggers se declenchent seuls
+await run('global',
+  `INSERT INTO LIGNECOMMANDES (IDLIGNECOMMANDE, IDCOMMANDE, IDPRODUIT, QUANTITE, REMISE)
+   VALUES (:1, :2, :3, :4, :5)`,
+  [idlignecommande, idcommande, idproduit, quantite, remise]);
+
+// 2) On laisse aux triggers le temps de propager
+await sleep(700);
+
+// 3) On constate sur quel(s) site(s) la ligne a atterri
+const [s1Rows, s2Rows] = await Promise.allSettled([
+  query('site1', findSql('LIGNECOMMANDES1'), [idlignecommande]),
+  query('site2', findSql('LIGNECOMMANDES2'), [idlignecommande]),
+]);
+\end{lstlisting}
+
+Les autres routes exposent l'état de santé des nœuds (\texttt{/api/health}, qui
+vérifie aussi l'état des déclencheurs et la dernière exécution du job de
+sauvegarde) et le contenu des fragments (\texttt{/api/fragments}). La page
+React rafraîchit l'état de santé toutes les dix secondes.
+
+% ============================================================================
+\section{Démonstration et captures d'écran}
+\label{sec:captures}
+% ============================================================================
+
+Cette section regroupe les captures d'écran illustrant le système en
+fonctionnement : l'orchestration des conteneurs, l'interface du tableau de bord,
+puis le déroulement des tests de manipulation (insertion, suppression, mise à
+jour) qui valident la synchronisation par déclencheurs
+(section~\ref{sec:triggers}).
+
+\subsection{Conteneurs Docker en cours d'exécution}
+
+\begin{figure}[h]
+\centering
+\screenshot{captures/docker-ps.png}{Sortie de \texttt{docker compose ps} montrant les quatre nœuds (global, site~1, site~2, sauvegarde) à l'état \texttt{healthy}.}
+\caption{Les conteneurs Oracle orchestrés par Docker Compose, tous démarrés.}
+\label{fig:cap-docker}
+\end{figure}
+
+\subsection{Tableau de bord web}
+
+\begin{figure}[h]
+\centering
+\screenshot{captures/dashboard.png}{Interface Next.js : formulaire d'insertion, badges de nœud et panneau des fragments.}
+\caption{Le tableau de bord affichant l'état des fragments répartis.}
+\label{fig:cap-dashboard}
+\end{figure}
+
+\subsection{Tests de manipulation des données}
+
+Les trois captures suivantes documentent un aller-retour complet sur la table
+\texttt{LIGNECOMMANDES} du nœud global et la propagation attendue vers le site
+propriétaire.
+
+\begin{figure}[h]
+\centering
+\screenshot{captures/test-insert.png}{Insertion d'une ligne sur le global, puis vérification de sa présence dans le fragment du site routé.}
+\caption{Test d'\textbf{insertion} et propagation vers le site.}
+\label{fig:cap-insert}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\screenshot{captures/test-delete.png}{Suppression d'une ligne sur le global et disparition de sa copie sur le site (avec nettoyage des parents orphelins).}
+\caption{Test de \textbf{suppression} et nettoyage en cascade.}
+\label{fig:cap-delete}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\screenshot{captures/test-update.png}{Mise à jour modifiant l'appartenance d'une ligne et provoquant sa migration d'un fragment à l'autre.}
+\caption{Test de \textbf{mise à jour} (changement de fragment).}
+\label{fig:cap-update}
+\end{figure}
+
+% ============================================================================
+\section{Avantages de l'architecture}
+% ============================================================================
+
+\begin{description}[leftmargin=0.6cm,style=nextline]
+  \item[\textbf{Transparence de localisation}] L'application n'a qu'un seul
+    point d'écriture (le global) et ignore où résident physiquement les
+    données. Synonymes et déclencheurs masquent entièrement la répartition.
+  \item[\textbf{Reproductibilité totale (infrastructure as code)}] L'intégralité
+    du système (topologie, schémas, données, logique) est décrite par des
+    fichiers versionnés. Un \texttt{docker compose up} reconstruit
+    l'environnement à l'identique ; les scripts \texttt{purge.sh} et
+    \texttt{rsite-1.sh} facilitent la remise à zéro.
+  \item[\textbf{Scripts idempotents}] L'emploi systématique de
+    \texttt{CREATE OR REPLACE} et de blocs \texttt{DROP \ldots\ EXCEPTION WHEN
+    OTHERS} rend les scripts ré-exécutables sans erreur.
+  \item[\textbf{Intégrité référentielle préservée par fragment}] Le
+    rapatriement automatique des lignes parentes et la reconstruction des clés
+    garantissent que chaque site reste un sous-schéma cohérent et interrogeable
+    de façon autonome.
+  \item[\textbf{Découplage à la compilation}] Le recours à
+    \texttt{EXECUTE IMMEDIATE} affranchit le système de l'ordre de démarrage des
+    conteneurs, point notoirement délicat des déploiements distribués.
+  \item[\textbf{Optimisation mesurable}] La démarche
+    \texttt{EXPLAIN PLAN} avant/après objective le gain apporté par les index et
+    la réécriture des prédicats.
+  \item[\textbf{Reconstruction efficace}] La disjonction garantie des fragments
+    autorise un \texttt{UNION ALL} sans déduplication pour reconstituer la vue
+    globale.
+  \item[\textbf{Observabilité}] Le tableau de bord et le job de sauvegarde
+    horaire offrent un suivi opérationnel immédiat de l'état du système.
+\end{description}
+
+% ============================================================================
+\section{Inconvénients et limites}
+\label{sec:limites}
+% ============================================================================
+
+\begin{description}[leftmargin=0.6cm,style=nextline]
+  \item[\textbf{Absence d'atomicité distribuée}] C'est la limite majeure. La
+    directive \texttt{PRAGMA AUTONOMOUS\_TRANSACTION} fait que les écritures de
+    site sont validées indépendamment de la transaction globale : un
+    \texttt{ROLLBACK} sur le global \emph{ne défait pas} une ligne déjà inscrite
+    sur un site. En cas d'échec partiel, les fragments peuvent diverger du
+    global. Une vraie cohérence exigerait une validation en deux phases (2PC/XA)
+    ou une file de messages transactionnelle (Oracle AQ).
+  \item[\textbf{Point de défaillance unique (SPOF)}] Tout le routage repose sur
+    le nœud global et ses déclencheurs. Si le global est indisponible, plus
+    aucune écriture ne peut être propagée ; les sites ne sont pas autonomes en
+    écriture.
+  \item[\textbf{Sauvegarde grossière (RPO élevé)}] Le nœud de secours procède
+    par rechargement complet (\texttt{TRUNCATE} + réinsertion) toutes les
+    heures : la perte de données potentielle peut atteindre une heure, le coût
+    est proportionnel au volume total (et non aux changements), et le
+    \texttt{TRUNCATE} (DDL auto-validé) laisse transitoirement les tables vides,
+    sans cohérence de lecture pendant la resynchronisation.
+  \item[\textbf{Sécurité perfectible}] Les mots de passe figurent en clair dans
+    les scripts et le fichier Compose. Les habilitations sont accordées par
+    \texttt{GRANT} directs plutôt que par rôles (le script de rôles est
+    d'ailleurs laissé en commentaire), et un compte de service unique
+    (\texttt{g\_user}) est partagé : le principe de moindre privilège n'est pas
+    respecté.
+  \item[\textbf{Génération de clés primaires fragile}] Le tableau de bord
+    calcule la prochaine clé par \texttt{MAX(IDLIGNECOMMANDE)+1}, ce qui est
+    sujet aux conditions de course en cas d'insertions concurrentes ; une
+    séquence Oracle serait préférable.
+  \item[\textbf{Propagation observée par temporisation}] La route d'insertion
+    attend 700~ms « en aveugle » avant de constater le routage : ce délai
+    arbitraire peut s'avérer trop court (faux négatif) ou inutilement long.
+  \item[\textbf{Coût des jointures distribuées}] Les requêtes Q6 rapatrient les
+    lignes des sites au travers des liens de base de données ; sur de gros
+    volumes, ces aller-retours réseau deviennent un goulot d'étranglement.
+  \item[\textbf{Asymétrie du scénario~1}] Sa fragmentation n'étant pas
+    exhaustive, une part des lignes n'existe que sur le global, ce qui complique
+    le raisonnement (une insertion peut n'aboutir sur aucun site).
+\end{description}
+
+% ============================================================================
+\section{Pistes d'amélioration}
+% ============================================================================
+
+\begin{enumerate}[leftmargin=1.4cm]
+  \item \textbf{Cohérence forte} : remplacer les transactions autonomes par une
+    validation en deux phases, ou adopter une réplication par
+    \emph{vues matérialisées} avec rafraîchissement à la validation
+    (\texttt{REFRESH FAST ON COMMIT}) ou par Oracle GoldenGate.
+  \item \textbf{Séquences Oracle} pour la génération des identifiants, en lieu et
+    place de \texttt{MAX+1}.
+  \item \textbf{Sécurité} : rôles applicatifs à privilèges minimaux, secrets
+    gérés hors du dépôt (Docker secrets, coffre-fort), comptes de service
+    distincts par usage.
+  \item \textbf{Sauvegarde incrémentale} fondée sur la capture de changements
+    (\emph{materialized view logs}, CDC) ou sur RMAN, afin de réduire le RPO et
+    le coût.
+  \item \textbf{Confirmation de propagation} fondée sur un événement ou un
+    sondage borné plutôt que sur un délai fixe dans le tableau de bord.
+  \item \textbf{Autonomie des sites} : autoriser des écritures locales avec
+    réconciliation, pour atténuer la dépendance au nœud global.
+\end{enumerate}
+
+% ============================================================================
+\section{Conclusion}
+% ============================================================================
+
+Ce projet met en œuvre, de bout en bout, une chaîne complète de gestion de
+données réparties : fragmentation horizontale paramétrable (par catégorie ou par
+volume), procédures stockées garantissant l'intégrité de chaque fragment,
+synchronisation automatique par déclencheurs avec routage transparent,
+optimisation de requêtes objectivée par les plans d'exécution, reconstruction
+distribuée du chiffre d'affaires, sauvegarde planifiée et tableau de bord
+d'observation. L'ensemble est entièrement reproductible grâce à Docker Compose
+et à des scripts idempotents.
+
+Les choix techniques les plus instructifs (le SQL dynamique pour briser la
+dépendance de compilation, les transactions autonomes pour permettre la
+validation distante) illustrent bien les arbitrages propres aux systèmes
+distribués : ici, la \emph{disponibilité} et la \emph{simplicité} de mise en
+œuvre ont été privilégiées au détriment de la \emph{cohérence forte}. Cette
+tension, caractéristique des bases de données réparties, constitue précisément
+le principal enseignement du projet, et trace la feuille de route d'une
+éventuelle version de production : validation en deux phases, sécurité durcie et
+sauvegarde incrémentale.
+
+\end{document}
