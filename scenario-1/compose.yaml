@@ -36,45 +36,45 @@ services:
     networks:
       - maroc-db-net
 
-  # db-backup:
-  #   image: gvenzl/oracle-free:23-slim-faststart
-  #   container_name: oracle-backup
-  #   environment:
-  #     - ORACLE_PWD=OracleAdmin123!
-  #     - ORACLE_PASSWORD=admin
-  #     - APP_USER=mon_user
-  #     - APP_USER_PASSWORD=mon_mdp
-  #     - TNS_ADMIN=/opt/oracle/network/admin
-  #   ports:
-  #     - "1524:1521"
-  #   volumes:
-  #     - backup-data:/opt/oracle/oradata
-  #     - ./backup-logs:/opt/oracle/logs
-  #     - ./scripts-backup:/container-entrypoint-initdb.d/
-  #     - ./tnsnames.ora:/opt/oracle/network/admin/tnsnames.ora
-  #   restart: unless-stopped
-  #   healthcheck:
-  #     test:
-  #       [
-  #         "CMD-SHELL",
-  #         "echo 'SELECT 1 FROM DUAL;' | sqlplus -s pdb_admin/Admin123@//localhost:1521/B_PDB > /dev/null 2>&1 || exit 1",
-  #       ]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 10
-  #     start_period: 90s
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: "1.0"
-  #         memory: 2G
-  #       reservations:
-  #         memory: 1500M
-  #   networks:
-  #     - maroc-db-net
-  #   depends_on:
-  #     db-global:
-  #       condition: service_healthy
+  db-backup:
+    image: gvenzl/oracle-free:23-slim-faststart
+    container_name: oracle-backup
+    environment:
+      - ORACLE_PWD=OracleAdmin123!
+      - ORACLE_PASSWORD=admin
+      - APP_USER=mon_user
+      - APP_USER_PASSWORD=mon_mdp
+      - TNS_ADMIN=/opt/oracle/network/admin
+    ports:
+      - "1524:1521"
+    volumes:
+      - backup-data:/opt/oracle/oradata
+      - ./backup-logs:/opt/oracle/logs
+      - ./scripts-backup:/container-entrypoint-initdb.d/
+      - ./tnsnames.ora:/opt/oracle/network/admin/tnsnames.ora
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "echo 'SELECT 1 FROM DUAL;' | sqlplus -s pdb_admin/Admin123@//localhost:1521/B_PDB > /dev/null 2>&1 || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2G
+        reservations:
+          memory: 1500M
+    networks:
+      - maroc-db-net
+    depends_on:
+      db-global:
+        condition: service_healthy
 
   db-site-2:
     image: gvenzl/oracle-free:23-slim-faststart
