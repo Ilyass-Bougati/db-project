@@ -7,7 +7,7 @@ ALTER SESSION SET CONTAINER = G_PDB;
 ALTER SESSION SET CURRENT_SCHEMA = pdb_admin;
 
 -- =============================================================
--- Q5-a: Number of orders per client in 2026
+-- Q5-a: Number of orders per client in 2020
 --
 -- Note: EXTRACT(YEAR FROM DATECOMMANDE) is NON-SARGABLE — a
 -- plain B-tree index on DATECOMMANDE stores raw DATE values,
@@ -22,7 +22,7 @@ SELECT
     COUNT(cmd.IDCOMMANDE) AS NB_COMMANDES
 FROM   CLIENTS c
 JOIN   COMMANDES cmd ON c.IDCLIENT = cmd.IDCLIENT
-WHERE  EXTRACT(YEAR FROM cmd.DATECOMMANDE) = 2026
+WHERE  EXTRACT(YEAR FROM cmd.DATECOMMANDE) = 2020
 GROUP  BY c.IDCLIENT, c.CODECLIENT, c.SOCIETE
 ORDER  BY NB_COMMANDES DESC;
 
@@ -45,7 +45,7 @@ SELECT
     COUNT(cmd.IDCOMMANDE) AS NB_COMMANDES
 FROM   CLIENTS c
 JOIN   COMMANDES cmd ON c.IDCLIENT = cmd.IDCLIENT
-WHERE  EXTRACT(YEAR FROM cmd.DATECOMMANDE) = 2026
+WHERE  EXTRACT(YEAR FROM cmd.DATECOMMANDE) = 2020
 GROUP  BY c.IDCLIENT, c.CODECLIENT, c.SOCIETE
 ORDER  BY NB_COMMANDES DESC;
 
@@ -118,7 +118,7 @@ END;
 --
 -- Same logical result set, but the filter is now a direct range
 -- over the raw DATE values stored in idx_commandes_date, so the
--- optimiser can descend the B-tree to 2026-01-01 and walk the
+-- optimiser can descend the B-tree to 2020-01-01 and walk the
 -- leaf blocks until the end of the year (INDEX RANGE SCAN).
 -- =============================================================
 EXPLAIN PLAN SET STATEMENT_ID = 'after_index' FOR
@@ -129,8 +129,8 @@ SELECT
     COUNT(cmd.IDCOMMANDE) AS NB_COMMANDES
 FROM   CLIENTS c
 JOIN   COMMANDES cmd ON c.IDCLIENT = cmd.IDCLIENT
-WHERE  cmd.DATECOMMANDE >= DATE '2026-01-01'
-AND    cmd.DATECOMMANDE <  DATE '2027-01-01'
+WHERE  cmd.DATECOMMANDE >= DATE '2020-01-01'
+AND    cmd.DATECOMMANDE <  DATE '2021-01-01'
 GROUP  BY c.IDCLIENT, c.CODECLIENT, c.SOCIETE
 ORDER  BY NB_COMMANDES DESC;
 
@@ -140,8 +140,8 @@ FROM   TABLE(DBMS_XPLAN.DISPLAY('PLAN_TABLE', 'after_index', 'TYPICAL'));
 /*
   Analysis — after indexes
   ────────────────────────
-  - INDEX RANGE SCAN on idx_commandes_date (expected if 2026 is
-    selective): only the blocks holding 2026 rows are touched.
+  - INDEX RANGE SCAN on idx_commandes_date (expected if 2020 is
+    selective): only the blocks holding 2020 rows are touched.
 
   - NESTED LOOPS via idx_commandes_idclient / CLIENTS PK: each
     qualifying order probes its client by index lookup instead of
@@ -152,14 +152,14 @@ FROM   TABLE(DBMS_XPLAN.DISPLAY('PLAN_TABLE', 'after_index', 'TYPICAL'));
 
   Caveat — the optimiser may IGNORE the indexes, and be right
   ───────────────────────────────────────────────────────────
-  If 2026 covers a large fraction of the 10 000 orders, an index
+  If 2020 covers a large fraction of the 10 000 orders, an index
   range scan + thousands of single-block table accesses by ROWID
   costs MORE than one multiblock full scan.  The optimiser's cost
   model knows this; an unchanged plan is correct behaviour, not a
   failure.  To make the index visibly win, use a more selective
   predicate, e.g. one month:
-      WHERE cmd.DATECOMMANDE >= DATE '2026-01-01'
-      AND   cmd.DATECOMMANDE <  DATE '2026-02-01'
+      WHERE cmd.DATECOMMANDE >= DATE '2020-01-01'
+      AND   cmd.DATECOMMANDE <  DATE '2020-02-01'
 */
 
 -- =============================================================
@@ -176,7 +176,7 @@ SELECT c.IDCLIENT, c.CODECLIENT, c.SOCIETE,
        COUNT(cmd.IDCOMMANDE) AS NB_COMMANDES
 FROM   CLIENTS c
 JOIN   COMMANDES cmd ON c.IDCLIENT = cmd.IDCLIENT
-WHERE  EXTRACT(YEAR FROM cmd.DATECOMMANDE) = 2026
+WHERE  EXTRACT(YEAR FROM cmd.DATECOMMANDE) = 2020
 GROUP  BY c.IDCLIENT, c.CODECLIENT, c.SOCIETE
 ORDER  BY NB_COMMANDES DESC;
 
@@ -185,8 +185,8 @@ SELECT c.IDCLIENT, c.CODECLIENT, c.SOCIETE,
        COUNT(cmd.IDCOMMANDE) AS NB_COMMANDES
 FROM   CLIENTS c
 JOIN   COMMANDES cmd ON c.IDCLIENT = cmd.IDCLIENT
-WHERE  cmd.DATECOMMANDE >= DATE '2026-01-01'
-AND    cmd.DATECOMMANDE <  DATE '2027-01-01'
+WHERE  cmd.DATECOMMANDE >= DATE '2020-01-01'
+AND    cmd.DATECOMMANDE <  DATE '2021-01-01'
 GROUP  BY c.IDCLIENT, c.CODECLIENT, c.SOCIETE
 ORDER  BY NB_COMMANDES DESC;
 

@@ -2,7 +2,7 @@
 -- Global DB — Distributed revenue query (Q6)
 --
 -- Calculates, for each product category, the total revenue
--- (chiffre d'affaires) achieved in 2026 by combining results
+-- (chiffre d'affaires) achieved in 2020 by combining results
 -- from both site fragments via database links.
 --
 -- Revenue per order line:
@@ -19,7 +19,7 @@ ALTER SESSION SET CURRENT_SCHEMA = pdb_admin;
 
 SELECT
     IDCATEG,
-    ROUND(SUM(CA_LIGNE), 2) AS CHIFFRE_AFFAIRES_2026
+    ROUND(SUM(CA_LIGNE), 2) AS CHIFFRE_AFFAIRES_2020
 FROM (
 
     -- ── Site 1 contribution (IDCATEG=50, QUANTITE>100) ──────
@@ -29,8 +29,8 @@ FROM (
     FROM   pdb_admin.LIGNECOMMANDES1@link_to_site1  lc
     JOIN   pdb_admin.PRODUITS1@link_to_site1         p  ON lc.IDPRODUIT  = p.IDPRODUIT
     JOIN   pdb_admin.COMMANDES1@link_to_site1        c  ON lc.IDCOMMANDE = c.IDCOMMANDE
-    WHERE  c.DATECOMMANDE >= DATE '2026-01-01'
-    AND    c.DATECOMMANDE <  DATE '2027-01-01'
+    WHERE  c.DATECOMMANDE >= DATE '2020-01-01'
+    AND    c.DATECOMMANDE <  DATE '2021-01-01'
 
     UNION ALL
 
@@ -41,12 +41,12 @@ FROM (
     FROM   pdb_admin.LIGNECOMMANDES2@link_to_site2  lc
     JOIN   pdb_admin.PRODUITS2@link_to_site2         p  ON lc.IDPRODUIT  = p.IDPRODUIT
     JOIN   pdb_admin.COMMANDES2@link_to_site2        c  ON lc.IDCOMMANDE = c.IDCOMMANDE
-    WHERE  c.DATECOMMANDE >= DATE '2026-01-01'
-    AND    c.DATECOMMANDE <  DATE '2027-01-01'
+    WHERE  c.DATECOMMANDE >= DATE '2020-01-01'
+    AND    c.DATECOMMANDE <  DATE '2021-01-01'
 
 )
 GROUP  BY IDCATEG
-ORDER  BY CHIFFRE_AFFAIRES_2026 DESC;
+ORDER  BY CHIFFRE_AFFAIRES_2020 DESC;
 
 -- Sentinel queried by the healthcheck to confirm all init scripts have run.
 -- Site containers depend on this being present before they start.
